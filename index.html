@@ -28,7 +28,8 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
 .section{margin:16px 0;}
 .section-header{display:flex;justify-content:space-between;align-items:center;padding:8px 20px;font-size:12px;color:var(--gray-500);font-weight:700;text-transform:uppercase;letter-spacing:0.6px;}
 .trip-list{background:white;}
-.trip{display:flex;gap:14px;padding:16px 20px;border-bottom:1px solid var(--gray-100);cursor:pointer;}
+.trip{display:flex;gap:14px;padding:14px 16px 14px 20px;border-bottom:1px solid var(--gray-100);position:relative;}
+.trip-content{display:flex;gap:14px;flex:1;cursor:pointer;min-width:0;}
 .trip:active{background:var(--gray-100);}
 .trip.has-error{background:#FEF2F2;}
 .trip.has-warning{background:#FFFBEB;}
@@ -45,6 +46,10 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
 .trip-issue{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;margin-top:6px;padding:6px 10px;border-radius:6px;}
 .trip-issue.error{background:var(--red-bg);color:var(--red);}
 .trip-issue.warning{background:var(--warn-bg);color:var(--warn);}
+.trip-reorder{display:flex;flex-direction:column;gap:4px;justify-content:center;flex-shrink:0;}
+.reorder-btn{width:32px;height:30px;border:1px solid var(--gray-200);background:white;border-radius:8px;cursor:pointer;font-size:14px;color:var(--gray-700);display:flex;align-items:center;justify-content:center;font-family:inherit;font-weight:700;padding:0;}
+.reorder-btn:active{background:var(--primary);color:white;border-color:var(--primary);transform:scale(0.9);}
+.reorder-btn:disabled{opacity:0.25;cursor:not-allowed;}
 .badge{font-size:10px;padding:3px 8px;border-radius:4px;font-weight:700;text-transform:uppercase;letter-spacing:0.3px;}
 .badge-sluzebni{background:var(--green-bg);color:var(--green);}
 .badge-soukroma{background:var(--orange-bg);color:var(--orange);}
@@ -117,7 +122,7 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
 <body>
 <div class="header">
 <div class="header-content">
-<div class="header-title">🚗 Kniha jízd<span class="version-tag">v4</span></div>
+<div class="header-title">🚗 Kniha jízd<span class="version-tag">v5</span></div>
 <div class="header-subtitle" id="vehicleSubtitle">Nastavte vozidlo →</div>
 </div>
 <div class="month-selector">
@@ -225,7 +230,9 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
 const state={trips:[],vehicle:null,currentMonth:new Date().getMonth(),currentYear:new Date().getFullYear(),currentScreen:'home',selectedPurpose:'Služební',autoFixedOnLoad:false,userOverrodeTacho:false};
 const MONTHS_CS=['Leden','Únor','Březen','Duben','Květen','Červen','Červenec','Srpen','Září','Říjen','Listopad','Prosinec'];
 const MONTHS_CS_SHORT=['Led','Úno','Bře','Dub','Kvě','Čer','Črc','Srp','Zář','Říj','Lis','Pro'];
-function loadData(){try{const t=localStorage.getItem('kj_trips');state.trips=t?JSON.parse(t):[];const v=localStorage.getItem('kj_vehicle');state.vehicle=v?JSON.parse(v):null;}catch(e){console.error(e);}}
+function loadData(){try{const t=localStorage.getItem('kj_trips');state.trips=t?JSON.parse(t):[];const v=localStorage.getItem('kj_vehicle');state.vehicle=v?JSON.parse(v):null;
+let maxOrder=0;state.trips.forEach(t=>{if(typeof t.sortOrder==='number')maxOrder=Math.max(maxOrder,t.sortOrder);});
+state.trips.forEach(t=>{if(typeof t.sortOrder!=='number'){maxOrder++;t.sortOrder=maxOrder;}});}catch(e){console.error(e);}}
 function saveTrips(){localStorage.setItem('kj_trips',JSON.stringify(state.trips));}
 function saveVehicle(){localStorage.setItem('kj_vehicle',JSON.stringify(state.vehicle));}
 function uid(){return Date.now().toString(36)+Math.random().toString(36).substr(2,5);}
@@ -235,7 +242,7 @@ function fmtNumber(n,dec=0){return (n||0).toLocaleString('cs-CZ',{minimumFractio
 function todayISO(){return new Date().toISOString().split('T')[0];}
 function parseISO(s){return new Date(s+'T00:00:00');}
 function escapeHtml(s){const div=document.createElement('div');div.textContent=s||'';return div.innerHTML;}
-function sortedByDate(trips){return [...trips].sort((a,b)=>{const c=(a.dateStart||'').localeCompare(b.dateStart||'');if(c!==0)return c;return (a.createdAt||0)-(b.createdAt||0);});}
+function sortedByDate(trips){return [...trips].sort((a,b)=>{const c=(a.dateStart||'').localeCompare(b.dateStart||'');if(c!==0)return c;const o=(a.sortOrder||0)-(b.sortOrder||0);if(o!==0)return o;return (a.createdAt||0)-(b.createdAt||0);});}
 function tachoEnd(trip){return Number(trip.tachoStart||0)+Number(trip.distance||0);}
 function getRouteParts(route){if(!route)return [];return route.split('→').map(s=>s.trim()).filter(s=>s);}
 function getRouteFirst(route){const parts=getRouteParts(route);return parts[0]||'';}
@@ -268,21 +275,52 @@ function renderStats(){const trips=tripsThisMonth();const km=trips.reduce((s,t)=
 function renderBanner(){const banner=document.getElementById('problemBanner');const trips=tripsThisMonth();let errorCount=0,warnCount=0;
 trips.forEach(t=>{const v=validateTrip(t,state.trips);errorCount+=v.errors.length;warnCount+=v.warnings.length;});
 let html='';
-if(state.autoFixedOnLoad){html+=`<div class="banner success"><span class="banner-icon">✓</span><div style="flex:1;">Tachometr byl automaticky přepočítán podle data jízd.</div><button class="banner-close" onclick="closeAutoFixBanner()">✕</button></div>`;}
+if(state.autoFixedOnLoad){html+=`<div class="banner success"><span class="banner-icon">✓</span><div style="flex:1;">Tachometr byl automaticky přepočítán.</div><button class="banner-close" onclick="closeAutoFixBanner()">✕</button></div>`;}
 if(errorCount>0){html+=`<div class="banner error"><span class="banner-icon">⚠️</span><div style="flex:1;"><b>${errorCount} chyb${errorCount>1?'':'a'}</b> v tomto měsíci.</div></div>`;}
 if(warnCount>0&&errorCount===0){html+=`<div class="banner warning"><span class="banner-icon">⚠️</span><div style="flex:1;"><b>${warnCount} upozornění</b> v tomto měsíci.</div></div>`;}
 banner.innerHTML=html;}
 function closeAutoFixBanner(){state.autoFixedOnLoad=false;renderBanner();}
 window.closeAutoFixBanner=closeAutoFixBanner;
-function renderTrips(){const list=document.getElementById('tripList');const trips=sortedByDate(tripsThisMonth()).reverse();
+function renderTrips(){const list=document.getElementById('tripList');
+const sortedAsc=sortedByDate(tripsThisMonth());
+const trips=[...sortedAsc].reverse();
 if(trips.length===0){list.innerHTML=`<div class="empty"><div class="empty-icon">🚙</div><div class="empty-text">Zatím žádné jízdy v měsíci ${MONTHS_CS[state.currentMonth]}.<br>Klepněte na tlačítko + pro přidání.</div></div>`;return;}
+const byDate={};
+sortedAsc.forEach(t=>{const d=t.dateStart;if(!byDate[d])byDate[d]=[];byDate[d].push(t);});
 list.innerHTML=trips.map(t=>{const d=parseISO(t.dateStart);const badge=t.purpose==='Soukromá'?'badge-soukroma':'badge-sluzebni';const tachoStr=t.tachoStart!==undefined&&t.distance?`${fmtNumber(t.tachoStart)}→${fmtNumber(tachoEnd(t))}`:'';
 const issues=validateTrip(t,state.trips);
 let cls='trip';let issueHtml='';
 if(issues.errors.length>0){cls+=' has-error';issueHtml=`<div class="trip-issue error">⚠️ ${issues.errors[0].msg}</div>`;}
 else if(issues.warnings.length>0){cls+=' has-warning';issueHtml=`<div class="trip-issue warning">⚠️ ${issues.warnings[0].msg}</div>`;}
-return `<div class="${cls}" data-id="${t.id}"><div class="trip-date"><div class="trip-day">${d.getDate()}</div><div class="trip-month">${MONTHS_CS_SHORT[d.getMonth()]}</div></div><div class="trip-info"><div class="trip-route">${escapeHtml(t.route||'(bez trasy)')}</div><div class="trip-meta"><span class="badge ${badge}">${t.purpose}</span>${t.distance?`<span>${fmtNumber(t.distance)} km</span>`:''}${tachoStr?`<span>${tachoStr}</span>`:''}</div>${issueHtml}</div></div>`;}).join('');
-list.querySelectorAll('.trip').forEach(el=>{el.addEventListener('click',()=>showDetail(el.dataset.id));});}
+const sameDay=byDate[t.dateStart]||[];
+const sameDayIdx=sameDay.findIndex(x=>x.id===t.id);
+const showReorder=sameDay.length>1;
+const canUp=showReorder&&sameDayIdx>0;
+const canDown=showReorder&&sameDayIdx<sameDay.length-1;
+let reorderHtml='';
+if(showReorder){reorderHtml=`<div class="trip-reorder"><button class="reorder-btn" onclick="moveTripWithinDay('${t.id}',-1);event.stopPropagation();" ${canUp?'':'disabled'} title="Posunout v rámci dne dříve">↑</button><button class="reorder-btn" onclick="moveTripWithinDay('${t.id}',1);event.stopPropagation();" ${canDown?'':'disabled'} title="Posunout v rámci dne později">↓</button></div>`;}
+return `<div class="${cls}" data-id="${t.id}">
+<div class="trip-content" onclick="showDetail('${t.id}')">
+<div class="trip-date"><div class="trip-day">${d.getDate()}</div><div class="trip-month">${MONTHS_CS_SHORT[d.getMonth()]}</div></div>
+<div class="trip-info"><div class="trip-route">${escapeHtml(t.route||'(bez trasy)')}</div><div class="trip-meta"><span class="badge ${badge}">${t.purpose}</span>${t.distance?`<span>${fmtNumber(t.distance)} km</span>`:''}${tachoStr?`<span>${tachoStr}</span>`:''}</div>${issueHtml}</div>
+</div>
+${reorderHtml}
+</div>`;}).join('');}
+function moveTripWithinDay(id,direction){const trip=state.trips.find(t=>t.id===id);if(!trip)return;
+const sameDay=sortedByDate(state.trips.filter(t=>t.dateStart===trip.dateStart));
+const idx=sameDay.findIndex(t=>t.id===id);
+const targetIdx=idx+direction;
+if(targetIdx<0||targetIdx>=sameDay.length)return;
+const other=sameDay[targetIdx];
+const tmp=trip.sortOrder;
+trip.sortOrder=other.sortOrder;
+other.sortOrder=tmp;
+recalcTachoChain();
+saveTrips();
+render();
+toast(direction<0?'Posunuto dřív':'Posunuto později');}
+window.moveTripWithinDay=moveTripWithinDay;
+window.showDetail=showDetail;
 function render(){renderHeader();renderStats();renderBanner();renderTrips();}
 function showScreen(name){state.currentScreen=name;document.querySelectorAll('[id^="screen-"]').forEach(s=>s.style.display='none');document.getElementById('screen-'+name).style.display='';document.querySelectorAll('.nav-item').forEach(n=>{n.classList.toggle('active',n.dataset.screen===name);});document.getElementById('fabAdd').style.display=(name==='home')?'':'none';}
 function autoFillTachoStart(){const dateStart=document.getElementById('tripDateStart').value;const id=document.getElementById('tripId').value;if(!dateStart)return;
@@ -314,7 +352,7 @@ const id=document.getElementById('tripId').value;
 if(!dateStart)return;
 if(dateEnd&&dateEnd<dateStart){document.getElementById('tripDateEnd').classList.add('has-error');document.getElementById('dateHint').innerHTML=`<div class="field-hint error"><span>❌</span><div>Datum konce nemůže být dříve než datum začátku.</div></div>`;}
 const otherTrips=state.trips.filter(t=>t.id!==id);
-const tempTrip={id:id||'_new',dateStart,dateEnd:dateEnd||dateStart,tachoStart,distance,route};
+const tempTrip={id:id||'_new',dateStart,dateEnd:dateEnd||dateStart,tachoStart,distance,route,sortOrder:99999};
 const sorted=sortedByDate([...otherTrips,tempTrip]);
 const myIdx=sorted.findIndex(t=>t.id===tempTrip.id);
 const prev=myIdx>0?sorted[myIdx-1]:null;
@@ -334,11 +372,12 @@ const kmDay=distance/days;
 if(kmDay>1000){const w=`<div class="field-hint warning"><span>⚠️</span><div>Vzdálenost <b>${fmtNumber(kmDay)} km/den</b> je neobvykle vysoká.</div></div>`;hintEl.innerHTML+=w;}}
 function applyTachoFix(val){document.getElementById('tripTachoStart').value=val;state.userOverrodeTacho=false;updateTachoLabel();validateLiveTrip();}
 window.applyTachoFix=applyTachoFix;
+function getNextSortOrder(){let max=0;state.trips.forEach(t=>{if(typeof t.sortOrder==='number'&&t.sortOrder>max)max=t.sortOrder;});return max+1;}
 function saveTrip(){const id=document.getElementById('tripId').value;const dateStart=document.getElementById('tripDateStart').value;const route=document.getElementById('tripRoute').value.trim();
 if(!dateStart){toast('Zadejte datum začátku');return;}
 if(!route){toast('Zadejte trasu');return;}
 const existing=id?state.trips.find(x=>x.id===id):null;
-const trip={id:id||uid(),createdAt:existing?existing.createdAt||Date.now():Date.now(),dateStart,dateEnd:document.getElementById('tripDateEnd').value||dateStart,route,purpose:state.selectedPurpose,tachoStart:Number(document.getElementById('tripTachoStart').value)||0,distance:Number(document.getElementById('tripDistance').value)||0,note:document.getElementById('tripNote').value.trim(),tachoManual:state.userOverrodeTacho};
+const trip={id:id||uid(),createdAt:existing?existing.createdAt||Date.now():Date.now(),sortOrder:existing?existing.sortOrder:getNextSortOrder(),dateStart,dateEnd:document.getElementById('tripDateEnd').value||dateStart,route,purpose:state.selectedPurpose,tachoStart:Number(document.getElementById('tripTachoStart').value)||0,distance:Number(document.getElementById('tripDistance').value)||0,note:document.getElementById('tripNote').value.trim(),tachoManual:state.userOverrodeTacho};
 if(id){const idx=state.trips.findIndex(x=>x.id===id);if(idx>=0)state.trips[idx]=trip;toast('Jízda upravena');}
 else{state.trips.push(trip);toast('Jízda přidána');}
 recalcTachoChain();
@@ -358,13 +397,16 @@ function insertArrow(){const input=document.getElementById('tripRoute');const st
 function swapRoute(){const input=document.getElementById('tripRoute');const parts=input.value.split('→').map(s=>s.trim()).filter(s=>s);if(parts.length<2){toast('Trasa potřebuje alespoň 2 zastávky');return;}const swapped=parts.reverse().join(' → ');input.value=swapped;toast('Trasa otočena');validateLiveTrip();}
 function clearRoute(){const input=document.getElementById('tripRoute');input.value='';input.focus();validateLiveTrip();}
 function autoConvertArrow(e){const input=e.target;const val=input.value;
-if(val.indexOf('--')===-1)return;
-const idx=val.indexOf('--');
-const before=val.substring(0,idx);
-const after=val.substring(idx+2);
+const patterns=['--','—','–'];
+let foundIdx=-1;let foundLen=0;
+for(const p of patterns){const idx=val.indexOf(p);if(idx!==-1){foundIdx=idx;foundLen=p.length;break;}}
+if(foundIdx===-1)return;
+const before=val.substring(0,foundIdx);
+const after=val.substring(foundIdx+foundLen);
 const cleanBefore=before.replace(/\s+$/,'');
 const cleanAfter=after.replace(/^\s+/,'');
 const newVal=cleanBefore+(cleanBefore?' ':'')+'→'+(cleanAfter?' ':'')+cleanAfter;
+if(newVal===val)return;
 input.value=newVal;
 const newCursor=cleanBefore.length+(cleanBefore?1:0)+1+(cleanAfter?1:0);
 input.setSelectionRange(newCursor,newCursor);
