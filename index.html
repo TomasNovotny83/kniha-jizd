@@ -81,12 +81,19 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
 .setup{padding:30px 20px;max-width:500px;margin:0 auto;text-align:center;}
 .setup h2{color:var(--primary);margin-bottom:12px;font-size:26px;}
 .setup p{color:var(--gray-500);margin-bottom:24px;}
+.route-input-wrap{position:relative;}
+.route-tools{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;}
+.route-tool-btn{background:var(--primary-bg);color:var(--primary);border:1.5px solid transparent;border-radius:10px;padding:8px 14px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:4px;}
+.route-tool-btn:active{background:var(--primary);color:white;transform:scale(0.95);}
+.route-tool-btn .icon{font-size:16px;font-weight:700;}
+.tip-text{font-size:11px;color:var(--gray-500);margin-top:6px;font-style:italic;}
+.version-tag{font-size:10px;background:rgba(255,255,255,0.2);padding:2px 6px;border-radius:4px;margin-left:6px;font-weight:600;}
 </style>
 </head>
 <body>
 <div class="header">
 <div class="header-content">
-<div class="header-title">🚗 Kniha jízd</div>
+<div class="header-title">🚗 Kniha jízd<span class="version-tag">v2</span></div>
 <div class="header-subtitle" id="vehicleSubtitle">Nastavte vozidlo →</div>
 </div>
 <div class="month-selector">
@@ -143,7 +150,18 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
 <div><label class="form-label">Datum začátku</label><input type="date" class="form-input" id="tripDateStart"></div>
 <div><label class="form-label">Datum konce</label><input type="date" class="form-input" id="tripDateEnd"></div>
 </div>
-<div class="form-row"><label class="form-label">Trasa</label><input type="text" class="form-input" id="tripRoute" placeholder="Např: Praha → Plzeň"></div>
+<div class="form-row">
+<label class="form-label">Trasa</label>
+<div class="route-input-wrap">
+<input type="text" class="form-input" id="tripRoute" placeholder="Např: Praha → Plzeň → Brno">
+<div class="route-tools">
+<button type="button" class="route-tool-btn" id="btnInsertArrow"><span class="icon">→</span>vložit šipku</button>
+<button type="button" class="route-tool-btn" id="btnSwapRoute">🔄 prohodit</button>
+<button type="button" class="route-tool-btn" id="btnClearRoute">✕ smazat</button>
+</div>
+<div class="tip-text">💡 Tip: napište <b>--</b> nebo <b>-></b> a automaticky se převede na →</div>
+</div>
+</div>
 <div class="form-row"><label class="form-label">Účel</label>
 <div class="purpose-toggle">
 <button type="button" data-purpose="Služební" class="active">Služební</button>
@@ -204,7 +222,11 @@ function showDetail(id){const t=state.trips.find(x=>x.id===id);if(!t)return;cons
 function closeDetailModal(){document.getElementById('detailModal').classList.remove('show');}
 function loadVehicleForm(){const v=state.vehicle||{};document.getElementById('vehicleZnacka').value=v.znacka||'';document.getElementById('vehicleModel').value=v.model||'';document.getElementById('vehicleSPZ').value=v.spz||'';document.getElementById('vehicleVIN').value=v.vin||'';document.getElementById('vehiclePalivo').value=v.palivo||'Nafta';document.getElementById('vehiclePocTacho').value=v.pocTacho||'';document.getElementById('vehicleSazba').value=v.sazba||'5.60';document.getElementById('vehicleRidic').value=v.ridic||'';}
 function saveVehicleForm(){state.vehicle={znacka:document.getElementById('vehicleZnacka').value.trim(),model:document.getElementById('vehicleModel').value.trim(),spz:document.getElementById('vehicleSPZ').value.trim(),vin:document.getElementById('vehicleVIN').value.trim(),palivo:document.getElementById('vehiclePalivo').value,pocTacho:Number(document.getElementById('vehiclePocTacho').value)||0,sazba:Number(document.getElementById('vehicleSazba').value)||5.60,ridic:document.getElementById('vehicleRidic').value.trim()};saveVehicle();toast('Vozidlo uloženo');renderHeader();showScreen('home');}
-function bindEvents(){document.getElementById('prevMonth').addEventListener('click',()=>{state.currentMonth--;if(state.currentMonth<0){state.currentMonth=11;state.currentYear--;}render();});document.getElementById('nextMonth').addEventListener('click',()=>{state.currentMonth++;if(state.currentMonth>11){state.currentMonth=0;state.currentYear++;}render();});document.getElementById('fabAdd').addEventListener('click',()=>openTripModal());document.querySelectorAll('.nav-item').forEach(n=>{n.addEventListener('click',()=>{const s=n.dataset.screen;if(s==='home')showScreen('home');else if(s==='vehicle'){loadVehicleForm();showScreen('vehicle');}else{toast('Tato sekce bude dostupná v dalším kroku');}});});document.getElementById('tripModalClose').addEventListener('click',closeTripModal);document.getElementById('tripCancel').addEventListener('click',closeTripModal);document.getElementById('tripSave').addEventListener('click',saveTrip);document.getElementById('tripDelete').addEventListener('click',deleteTrip);document.querySelectorAll('.purpose-toggle button').forEach(b=>{b.addEventListener('click',()=>setPurpose(b.dataset.purpose));});document.getElementById('detailModalClose').addEventListener('click',closeDetailModal);document.getElementById('detailDone').addEventListener('click',closeDetailModal);document.getElementById('detailEdit').addEventListener('click',(e)=>{closeDetailModal();openTripModal(e.target.dataset.id);});document.getElementById('saveVehicle').addEventListener('click',saveVehicleForm);document.querySelectorAll('.modal-overlay').forEach(o=>{o.addEventListener('click',(e)=>{if(e.target===o)o.classList.remove('show');});});}
+function insertArrow(){const input=document.getElementById('tripRoute');const start=input.selectionStart;const end=input.selectionEnd;const txt=input.value;const before=txt.substring(0,start);const after=txt.substring(end);const needSpaceBefore=before.length>0&&!before.endsWith(' ');const needSpaceAfter=!after.startsWith(' ');const arrow=(needSpaceBefore?' ':'')+'→'+(needSpaceAfter?' ':'');input.value=before+arrow+after;const newPos=start+arrow.length;input.focus();input.setSelectionRange(newPos,newPos);}
+function swapRoute(){const input=document.getElementById('tripRoute');const parts=input.value.split('→').map(s=>s.trim()).filter(s=>s);if(parts.length<2){toast('Trasa potřebuje alespoň 2 zastávky');return;}const swapped=parts.reverse().join(' → ');input.value=swapped;toast('Trasa otočena');}
+function clearRoute(){const input=document.getElementById('tripRoute');input.value='';input.focus();}
+function autoConvertArrow(e){const input=e.target;const val=input.value;const cursor=input.selectionStart;let newVal=val;let cursorDelta=0;const patterns=[{find:'--',replace:' → '},{find:'->',replace:' → '},{find:'=>',replace:' → '}];for(const p of patterns){const idx=newVal.indexOf(p.find);if(idx!==-1&&idx<cursor){const before=newVal.substring(0,idx);const after=newVal.substring(idx+p.find.length);const cleanBefore=before.replace(/\s+$/,'');const cleanAfter=after.replace(/^\s+/,'');newVal=cleanBefore+' → '+cleanAfter;cursorDelta=newVal.length-val.length;break;}}if(newVal!==val){input.value=newVal;const newCursor=Math.min(cursor+cursorDelta,newVal.length);input.setSelectionRange(newCursor,newCursor);}}
+function bindEvents(){document.getElementById('prevMonth').addEventListener('click',()=>{state.currentMonth--;if(state.currentMonth<0){state.currentMonth=11;state.currentYear--;}render();});document.getElementById('nextMonth').addEventListener('click',()=>{state.currentMonth++;if(state.currentMonth>11){state.currentMonth=0;state.currentYear++;}render();});document.getElementById('fabAdd').addEventListener('click',()=>openTripModal());document.querySelectorAll('.nav-item').forEach(n=>{n.addEventListener('click',()=>{const s=n.dataset.screen;if(s==='home')showScreen('home');else if(s==='vehicle'){loadVehicleForm();showScreen('vehicle');}else{toast('Tato sekce bude dostupná v dalším kroku');}});});document.getElementById('tripModalClose').addEventListener('click',closeTripModal);document.getElementById('tripCancel').addEventListener('click',closeTripModal);document.getElementById('tripSave').addEventListener('click',saveTrip);document.getElementById('tripDelete').addEventListener('click',deleteTrip);document.querySelectorAll('.purpose-toggle button').forEach(b=>{b.addEventListener('click',()=>setPurpose(b.dataset.purpose));});document.getElementById('detailModalClose').addEventListener('click',closeDetailModal);document.getElementById('detailDone').addEventListener('click',closeDetailModal);document.getElementById('detailEdit').addEventListener('click',(e)=>{closeDetailModal();openTripModal(e.target.dataset.id);});document.getElementById('saveVehicle').addEventListener('click',saveVehicleForm);document.querySelectorAll('.modal-overlay').forEach(o=>{o.addEventListener('click',(e)=>{if(e.target===o)o.classList.remove('show');});});document.getElementById('btnInsertArrow').addEventListener('click',insertArrow);document.getElementById('btnSwapRoute').addEventListener('click',swapRoute);document.getElementById('btnClearRoute').addEventListener('click',clearRoute);document.getElementById('tripRoute').addEventListener('input',autoConvertArrow);}
 loadData();bindEvents();render();
 if(!state.vehicle){loadVehicleForm();showScreen('vehicle');toast('Vítejte! Nastavte prosím vaše vozidlo.',3500);}
 </script>
