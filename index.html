@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#1F3864">
+<title>Kniha jízd</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{--primary:#1F3864;--primary-light:#4472C4;--primary-bg:#EBF3FB;--green:#2D6A3F;--green-bg:#E2EFDA;--orange:#C2410C;--orange-bg:#FCE4D6;--red:#C00000;--red-bg:#FFCCCC;--gray-50:#F8FAFC;--gray-100:#F1F5F9;--gray-200:#E5E7EB;--gray-300:#D1D5DB;--gray-500:#6B7280;--gray-700:#374151;--gray-900:#111827;--shadow-sm:0 1px 2px rgba(0,0,0,0.04);--shadow-md:0 2px 8px rgba(0,0,0,0.06);--shadow-lg:0 8px 24px rgba(0,0,0,0.10);}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--gray-50);color:var(--gray-900);font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased;min-height:100vh;padding-bottom:90px;}
+.header{background:linear-gradient(135deg,var(--primary) 0%,var(--primary-light) 100%);color:white;padding:env(safe-area-inset-top) 20px 20px 20px;position:sticky;top:0;z-index:100;box-shadow:var(--shadow-md);}
+.header-content{padding-top:16px;}
+.header-title{font-size:22px;font-weight:700;letter-spacing:-0.3px;display:flex;align-items:center;gap:10px;}
+.header-subtitle{font-size:13px;opacity:0.85;margin-top:2px;}
+.month-selector{display:flex;align-items:center;justify-content:space-between;background:rgba(255,255,255,0.12);border-radius:12px;padding:8px 12px;margin-top:16px;}
+.month-nav{background:rgba(255,255,255,0.15);border:none;color:white;width:32px;height:32px;border-radius:8px;cursor:pointer;font-size:16px;}
+.month-name{font-weight:600;font-size:16px;}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--gray-200);margin-bottom:12px;}
+.stat{background:white;padding:18px 12px;text-align:center;}
+.stat-value{font-size:22px;font-weight:700;color:var(--primary);letter-spacing:-0.5px;}
+.stat-label{font-size:11px;color:var(--gray-500);margin-top:4px;text-transform:uppercase;font-weight:600;letter-spacing:0.4px;}
+.section{margin:16px 0;}
+.section-header{display:flex;justify-content:space-between;align-items:center;padding:8px 20px;font-size:12px;color:var(--gray-500);font-weight:700;text-transform:uppercase;letter-spacing:0.6px;}
+.trip-list{background:white;}
+.trip{display:flex;gap:14px;padding:16px 20px;border-bottom:1px solid var(--gray-100);cursor:pointer;}
+.trip:active{background:var(--gray-100);}
+.trip-date{background:var(--primary-bg);border-radius:10px;padding:8px 10px;min-width:54px;text-align:center;flex-shrink:0;}
+.trip-day{font-size:20px;font-weight:700;color:var(--primary);line-height:1;}
+.trip-month{font-size:10px;color:var(--gray-500);margin-top:2px;text-transform:uppercase;font-weight:600;}
+.trip-info{flex:1;min-width:0;}
+.trip-route{font-size:15px;font-weight:600;color:var(--gray-900);margin-bottom:6px;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;line-height:1.35;}
+.trip-meta{display:flex;gap:10px;align-items:center;flex-wrap:wrap;font-size:13px;color:var(--gray-500);}
+.badge{font-size:10px;padding:3px 8px;border-radius:4px;font-weight:700;text-transform:uppercase;letter-spacing:0.3px;}
+.badge-sluzebni{background:var(--green-bg);color:var(--green);}
+.badge-soukroma{background:var(--orange-bg);color:var(--orange);}
+.empty{padding:60px 20px;text-align:center;color:var(--gray-500);}
+.empty-icon{font-size:48px;margin-bottom:12px;opacity:0.3;}
+.empty-text{font-size:14px;}
+.fab{position:fixed;bottom:90px;right:20px;width:60px;height:60px;border-radius:50%;background:var(--primary);color:white;border:none;display:flex;align-items:center;justify-content:center;font-size:32px;cursor:pointer;z-index:50;box-shadow:0 8px 24px rgba(31,56,100,0.35);}
+.fab:active{transform:scale(0.92);}
+.bottom-nav{position:fixed;bottom:0;left:0;right:0;background:white;border-top:1px solid var(--gray-200);display:grid;grid-template-columns:repeat(5,1fr);padding-bottom:env(safe-area-inset-bottom);z-index:50;}
+.nav-item{padding:10px 4px 8px;text-align:center;cursor:pointer;color:var(--gray-500);}
+.nav-item.active{color:var(--primary);}
+.nav-icon{font-size:22px;display:block;margin-bottom:2px;}
+.nav-label{font-size:10px;font-weight:600;}
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:200;opacity:0;pointer-events:none;transition:opacity 0.2s;display:flex;align-items:flex-end;justify-content:center;}
+.modal-overlay.show{opacity:1;pointer-events:auto;}
+.modal{background:white;width:100%;max-width:600px;max-height:90vh;border-radius:20px 20px 0 0;overflow:hidden;transform:translateY(100%);transition:transform 0.25s cubic-bezier(0.32,0.72,0,1);display:flex;flex-direction:column;}
+.modal-overlay.show .modal{transform:translateY(0);}
+.modal-header{padding:16px 20px;border-bottom:1px solid var(--gray-200);display:flex;justify-content:space-between;align-items:center;flex-shrink:0;}
+.modal-title{font-size:18px;font-weight:700;color:var(--gray-900);}
+.modal-close{background:var(--gray-100);border:none;width:32px;height:32px;border-radius:50%;cursor:pointer;font-size:16px;color:var(--gray-700);}
+.modal-body{padding:20px;overflow-y:auto;flex:1;}
+.modal-footer{padding:16px 20px;border-top:1px solid var(--gray-200);display:flex;gap:10px;flex-shrink:0;padding-bottom:max(16px,env(safe-area-inset-bottom));}
+.form-row{margin-bottom:18px;}
+.form-row-double{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.form-label{display:block;font-size:12px;font-weight:700;color:var(--gray-700);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.4px;}
+.form-input,.form-select,.form-textarea{width:100%;padding:14px 16px;font-size:16px;border:1.5px solid var(--gray-200);border-radius:12px;background:white;font-family:inherit;color:var(--gray-900);-webkit-appearance:none;appearance:none;}
+.form-input:focus,.form-select:focus,.form-textarea:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 3px rgba(31,56,100,0.1);}
+.form-textarea{resize:vertical;min-height:70px;}
+.purpose-toggle{display:grid;grid-template-columns:1fr 1fr;gap:8px;background:var(--gray-100);padding:4px;border-radius:12px;}
+.purpose-toggle button{padding:10px;border:none;background:transparent;cursor:pointer;border-radius:9px;font-weight:600;font-size:14px;color:var(--gray-500);font-family:inherit;}
+.purpose-toggle button.active{background:white;color:var(--primary);box-shadow:var(--shadow-sm);}
+.btn{padding:14px 20px;border:none;border-radius:12px;font-size:15px;font-weight:600;cursor:pointer;font-family:inherit;flex:1;text-align:center;}
+.btn:active{transform:scale(0.97);}
+.btn-primary{background:var(--primary);color:white;}
+.btn-secondary{background:var(--gray-100);color:var(--gray-700);}
+.btn-danger{background:var(--red-bg);color:var(--red);}
+.detail-row{padding:12px 0;border-bottom:1px solid var(--gray-100);display:flex;justify-content:space-between;align-items:center;gap:12px;}
+.detail-row:last-child{border-bottom:none;}
+.detail-label{font-size:13px;color:var(--gray-500);font-weight:500;}
+.detail-value{font-size:15px;color:var(--gray-900);font-weight:600;text-align:right;}
+.toast{position:fixed;bottom:100px;left:50%;transform:translateX(-50%) translateY(100px);background:var(--gray-900);color:white;padding:12px 20px;border-radius:12px;font-size:14px;font-weight:500;box-shadow:var(--shadow-lg);z-index:300;opacity:0;transition:all 0.3s cubic-bezier(0.32,0.72,0,1);pointer-events:none;white-space:nowrap;}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+.setup{padding:30px 20px;max-width:500px;margin:0 auto;text-align:center;}
+.setup h2{color:var(--primary);margin-bottom:12px;font-size:26px;}
+.setup p{color:var(--gray-500);margin-bottom:24px;}
+</style>
+</head>
+<body>
+<div class="header">
+<div class="header-content">
+<div class="header-title">🚗 Kniha jízd</div>
+<div class="header-subtitle" id="vehicleSubtitle">Nastavte vozidlo →</div>
+</div>
+<div class="month-selector">
+<button class="month-nav" id="prevMonth">‹</button>
+<span class="month-name" id="monthName">Květen 2026</span>
+<button class="month-nav" id="nextMonth">›</button>
+</div>
+</div>
+<div id="screen-home">
+<div class="stats">
+<div class="stat"><div class="stat-value" id="statKm">0</div><div class="stat-label">km měsíc</div></div>
+<div class="stat"><div class="stat-value" id="statJizdy">0</div><div class="stat-label">jízdy</div></div>
+<div class="stat"><div class="stat-value" id="statLitry">0,0</div><div class="stat-label">l natankováno</div></div>
+</div>
+<div class="section">
+<div class="section-header"><span>Jízdy tento měsíc</span></div>
+<div class="trip-list" id="tripList"><div class="empty"><div class="empty-icon">🚙</div><div class="empty-text">Zatím žádné jízdy.<br>Klepněte na tlačítko + pro přidání první jízdy.</div></div></div>
+</div>
+</div>
+<div id="screen-vehicle" style="display:none;">
+<div class="setup"><h2>🚗 Vozidlo</h2><p>Nastavte základní údaje o vozidle</p></div>
+<div style="background:white;padding:20px;max-width:600px;margin:0 auto;">
+<div class="form-row form-row-double">
+<div><label class="form-label">Značka</label><input type="text" class="form-input" id="vehicleZnacka" placeholder="Citroen"></div>
+<div><label class="form-label">Model</label><input type="text" class="form-input" id="vehicleModel" placeholder="Berlingo XL"></div>
+</div>
+<div class="form-row form-row-double">
+<div><label class="form-label">SPZ</label><input type="text" class="form-input" id="vehicleSPZ" placeholder="7SB9733"></div>
+<div><label class="form-label">Palivo</label><select class="form-select" id="vehiclePalivo"><option value="Nafta">Nafta</option><option value="Benzín">Benzín</option><option value="Elektro">Elektro</option><option value="LPG">LPG</option><option value="CNG">CNG</option></select></div>
+</div>
+<div class="form-row"><label class="form-label">VIN</label><input type="text" class="form-input" id="vehicleVIN" placeholder="VR7EBYHP7SJ972334"></div>
+<div class="form-row form-row-double">
+<div><label class="form-label">Počáteční tachometr (km)</label><input type="number" class="form-input" id="vehiclePocTacho" placeholder="0"></div>
+<div><label class="form-label">Sazba náhrady (Kč/km)</label><input type="number" class="form-input" id="vehicleSazba" step="0.01" placeholder="5.60"></div>
+</div>
+<div class="form-row"><label class="form-label">Řidič</label><input type="text" class="form-input" id="vehicleRidic" placeholder="Tomáš Novotný"></div>
+<button class="btn btn-primary" id="saveVehicle" style="width:100%;">Uložit vozidlo</button>
+</div>
+</div>
+<button class="fab" id="fabAdd">+</button>
+<div class="bottom-nav">
+<div class="nav-item active" data-screen="home"><span class="nav-icon">📋</span><span class="nav-label">Jízdy</span></div>
+<div class="nav-item" data-screen="phm"><span class="nav-icon">⛽</span><span class="nav-label">PHM</span></div>
+<div class="nav-item" data-screen="trasy"><span class="nav-icon">⭐</span><span class="nav-label">Trasy</span></div>
+<div class="nav-item" data-screen="vehicle"><span class="nav-icon">🚗</span><span class="nav-label">Vozidlo</span></div>
+<div class="nav-item" data-screen="settings"><span class="nav-icon">⚙️</span><span class="nav-label">Více</span></div>
+</div>
+<div class="modal-overlay" id="tripModal">
+<div class="modal">
+<div class="modal-header"><div class="modal-title" id="tripModalTitle">Nová jízda</div><button class="modal-close" id="tripModalClose">✕</button></div>
+<div class="modal-body">
+<input type="hidden" id="tripId">
+<div class="form-row form-row-double">
+<div><label class="form-label">Datum začátku</label><input type="date" class="form-input" id="tripDateStart"></div>
+<div><label class="form-label">Datum konce</label><input type="date" class="form-input" id="tripDateEnd"></div>
+</div>
+<div class="form-row"><label class="form-label">Trasa</label><input type="text" class="form-input" id="tripRoute" placeholder="Např: Praha → Plzeň"></div>
+<div class="form-row"><label class="form-label">Účel</label>
+<div class="purpose-toggle">
+<button type="button" data-purpose="Služební" class="active">Služební</button>
+<button type="button" data-purpose="Soukromá">Soukromá</button>
+</div>
+</div>
+<div class="form-row form-row-double">
+<div><label class="form-label">Tacho start (km)</label><input type="number" class="form-input" id="tripTachoStart" placeholder="0"></div>
+<div><label class="form-label">Vzdálenost (km)</label><input type="number" class="form-input" id="tripDistance" placeholder="0"></div>
+</div>
+<div class="form-row"><label class="form-label">Poznámka</label><textarea class="form-textarea" id="tripNote" placeholder="Volný text..."></textarea></div>
+</div>
+<div class="modal-footer">
+<button class="btn btn-danger" id="tripDelete" style="display:none;">Smazat</button>
+<button class="btn btn-secondary" id="tripCancel">Zrušit</button>
+<button class="btn btn-primary" id="tripSave">Uložit</button>
+</div>
+</div>
+</div>
+<div class="modal-overlay" id="detailModal">
+<div class="modal">
+<div class="modal-header"><div class="modal-title">Detail jízdy</div><button class="modal-close" id="detailModalClose">✕</button></div>
+<div class="modal-body" id="detailBody"></div>
+<div class="modal-footer">
+<button class="btn btn-secondary" id="detailEdit">Upravit</button>
+<button class="btn btn-primary" id="detailDone">Zavřít</button>
+</div>
+</div>
+</div>
+<div class="toast" id="toast"></div>
+<script>
+'use strict';
+const state={trips:[],vehicle:null,currentMonth:new Date().getMonth(),currentYear:new Date().getFullYear(),currentScreen:'home',selectedPurpose:'Služební'};
+const MONTHS_CS=['Leden','Únor','Březen','Duben','Květen','Červen','Červenec','Srpen','Září','Říjen','Listopad','Prosinec'];
+const MONTHS_CS_SHORT=['Led','Úno','Bře','Dub','Kvě','Čer','Črc','Srp','Zář','Říj','Lis','Pro'];
+function loadData(){try{const t=localStorage.getItem('kj_trips');state.trips=t?JSON.parse(t):[];const v=localStorage.getItem('kj_vehicle');state.vehicle=v?JSON.parse(v):null;}catch(e){console.error(e);}}
+function saveTrips(){localStorage.setItem('kj_trips',JSON.stringify(state.trips));}
+function saveVehicle(){localStorage.setItem('kj_vehicle',JSON.stringify(state.vehicle));}
+function uid(){return Date.now().toString(36)+Math.random().toString(36).substr(2,5);}
+function toast(msg,duration=2000){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),duration);}
+function fmtCurrency(n){return (n||0).toLocaleString('cs-CZ',{minimumFractionDigits:2,maximumFractionDigits:2})+' Kč';}
+function fmtNumber(n,dec=0){return (n||0).toLocaleString('cs-CZ',{minimumFractionDigits:dec,maximumFractionDigits:dec});}
+function todayISO(){return new Date().toISOString().split('T')[0];}
+function parseISO(s){return new Date(s+'T00:00:00');}
+function escapeHtml(s){const div=document.createElement('div');div.textContent=s||'';return div.innerHTML;}
+function renderHeader(){document.getElementById('monthName').textContent=MONTHS_CS[state.currentMonth]+' '+state.currentYear;const subtitle=state.vehicle?`${state.vehicle.znacka} ${state.vehicle.model} · ${state.vehicle.spz}`:'Nastavte vozidlo →';document.getElementById('vehicleSubtitle').textContent=subtitle;}
+function tripsThisMonth(){return state.trips.filter(t=>{if(!t.dateStart)return false;const d=parseISO(t.dateStart);return d.getMonth()===state.currentMonth&&d.getFullYear()===state.currentYear;}).sort((a,b)=>b.dateStart.localeCompare(a.dateStart));}
+function renderStats(){const trips=tripsThisMonth();const km=trips.reduce((s,t)=>s+(Number(t.distance)||0),0);document.getElementById('statKm').textContent=fmtNumber(km);document.getElementById('statJizdy').textContent=trips.length;document.getElementById('statLitry').textContent=fmtNumber(0,1);}
+function renderTrips(){const list=document.getElementById('tripList');const trips=tripsThisMonth();if(trips.length===0){list.innerHTML=`<div class="empty"><div class="empty-icon">🚙</div><div class="empty-text">Zatím žádné jízdy v měsíci ${MONTHS_CS[state.currentMonth]}.<br>Klepněte na tlačítko + pro přidání.</div></div>`;return;}list.innerHTML=trips.map(t=>{const d=parseISO(t.dateStart);const badge=t.purpose==='Soukromá'?'badge-soukroma':'badge-sluzebni';const tachoInfo=t.tachoStart!==undefined&&t.distance?`${fmtNumber(t.tachoStart)}→${fmtNumber(Number(t.tachoStart)+Number(t.distance))}`:'';return `<div class="trip" data-id="${t.id}"><div class="trip-date"><div class="trip-day">${d.getDate()}</div><div class="trip-month">${MONTHS_CS_SHORT[d.getMonth()]}</div></div><div class="trip-info"><div class="trip-route">${escapeHtml(t.route||'(bez trasy)')}</div><div class="trip-meta"><span class="badge ${badge}">${t.purpose}</span>${t.distance?`<span>${fmtNumber(t.distance)} km</span>`:''}${tachoInfo?`<span>${tachoInfo}</span>`:''}</div></div></div>`;}).join('');list.querySelectorAll('.trip').forEach(el=>{el.addEventListener('click',()=>showDetail(el.dataset.id));});}
+function render(){renderHeader();renderStats();renderTrips();}
+function showScreen(name){state.currentScreen=name;document.querySelectorAll('[id^="screen-"]').forEach(s=>s.style.display='none');document.getElementById('screen-'+name).style.display='';document.querySelectorAll('.nav-item').forEach(n=>{n.classList.toggle('active',n.dataset.screen===name);});document.getElementById('fabAdd').style.display=(name==='home')?'':'none';}
+function openTripModal(tripId=null){const modal=document.getElementById('tripModal');document.getElementById('tripId').value=tripId||'';document.getElementById('tripModalTitle').textContent=tripId?'Upravit jízdu':'Nová jízda';document.getElementById('tripDelete').style.display=tripId?'':'none';if(tripId){const t=state.trips.find(x=>x.id===tripId);if(t){document.getElementById('tripDateStart').value=t.dateStart||'';document.getElementById('tripDateEnd').value=t.dateEnd||t.dateStart||'';document.getElementById('tripRoute').value=t.route||'';document.getElementById('tripTachoStart').value=t.tachoStart||'';document.getElementById('tripDistance').value=t.distance||'';document.getElementById('tripNote').value=t.note||'';setPurpose(t.purpose||'Služební');}}else{const today=todayISO();document.getElementById('tripDateStart').value=today;document.getElementById('tripDateEnd').value=today;document.getElementById('tripRoute').value='';document.getElementById('tripNote').value='';document.getElementById('tripDistance').value='';const lastTrip=[...state.trips].sort((a,b)=>b.dateStart.localeCompare(a.dateStart))[0];if(lastTrip&&lastTrip.tachoStart!==undefined&&lastTrip.distance){document.getElementById('tripTachoStart').value=Number(lastTrip.tachoStart)+Number(lastTrip.distance);}else if(state.vehicle&&state.vehicle.pocTacho){document.getElementById('tripTachoStart').value=state.vehicle.pocTacho;}else{document.getElementById('tripTachoStart').value='';}setPurpose('Služební');}modal.classList.add('show');}
+function setPurpose(p){state.selectedPurpose=p;document.querySelectorAll('.purpose-toggle button').forEach(b=>{b.classList.toggle('active',b.dataset.purpose===p);});}
+function closeTripModal(){document.getElementById('tripModal').classList.remove('show');}
+function saveTrip(){const id=document.getElementById('tripId').value;const trip={id:id||uid(),dateStart:document.getElementById('tripDateStart').value,dateEnd:document.getElementById('tripDateEnd').value||document.getElementById('tripDateStart').value,route:document.getElementById('tripRoute').value.trim(),purpose:state.selectedPurpose,tachoStart:Number(document.getElementById('tripTachoStart').value)||0,distance:Number(document.getElementById('tripDistance').value)||0,note:document.getElementById('tripNote').value.trim()};if(!trip.dateStart){toast('Zadejte datum začátku');return;}if(!trip.route){toast('Zadejte trasu');return;}if(id){const idx=state.trips.findIndex(x=>x.id===id);if(idx>=0)state.trips[idx]=trip;toast('Jízda upravena');}else{state.trips.push(trip);toast('Jízda přidána');}saveTrips();closeTripModal();render();}
+function deleteTrip(){const id=document.getElementById('tripId').value;if(!id)return;if(!confirm('Opravdu smazat tuto jízdu?'))return;state.trips=state.trips.filter(x=>x.id!==id);saveTrips();closeTripModal();closeDetailModal();toast('Jízda smazána');render();}
+function showDetail(id){const t=state.trips.find(x=>x.id===id);if(!t)return;const d=parseISO(t.dateStart);const tachoEnd=Number(t.tachoStart)+Number(t.distance);const sazba=state.vehicle?Number(state.vehicle.sazba)||0:0;const nahrada=t.purpose==='Služební'?Number(t.distance)*sazba:0;document.getElementById('detailBody').innerHTML=`<div class="detail-row"><span class="detail-label">Datum</span><span class="detail-value">${d.getDate()}. ${MONTHS_CS_SHORT[d.getMonth()]}. ${d.getFullYear()}</span></div><div class="detail-row"><span class="detail-label">Trasa</span><span class="detail-value" style="max-width:60%;">${escapeHtml(t.route)}</span></div><div class="detail-row"><span class="detail-label">Účel</span><span class="detail-value"><span class="badge ${t.purpose==='Soukromá'?'badge-soukroma':'badge-sluzebni'}">${t.purpose}</span></span></div><div class="detail-row"><span class="detail-label">Tacho start</span><span class="detail-value">${fmtNumber(t.tachoStart)} km</span></div><div class="detail-row"><span class="detail-label">Tacho konec</span><span class="detail-value">${fmtNumber(tachoEnd)} km</span></div><div class="detail-row"><span class="detail-label">Vzdálenost</span><span class="detail-value">${fmtNumber(t.distance)} km</span></div>${nahrada>0?`<div class="detail-row"><span class="detail-label">Náhrada</span><span class="detail-value">${fmtCurrency(nahrada)}</span></div>`:''}${t.note?`<div class="detail-row" style="flex-direction:column;align-items:flex-start;"><span class="detail-label" style="margin-bottom:6px;">Poznámka</span><span class="detail-value" style="text-align:left;font-weight:400;color:var(--gray-700);">${escapeHtml(t.note)}</span></div>`:''}`;document.getElementById('detailEdit').dataset.id=id;document.getElementById('detailModal').classList.add('show');}
+function closeDetailModal(){document.getElementById('detailModal').classList.remove('show');}
+function loadVehicleForm(){const v=state.vehicle||{};document.getElementById('vehicleZnacka').value=v.znacka||'';document.getElementById('vehicleModel').value=v.model||'';document.getElementById('vehicleSPZ').value=v.spz||'';document.getElementById('vehicleVIN').value=v.vin||'';document.getElementById('vehiclePalivo').value=v.palivo||'Nafta';document.getElementById('vehiclePocTacho').value=v.pocTacho||'';document.getElementById('vehicleSazba').value=v.sazba||'5.60';document.getElementById('vehicleRidic').value=v.ridic||'';}
+function saveVehicleForm(){state.vehicle={znacka:document.getElementById('vehicleZnacka').value.trim(),model:document.getElementById('vehicleModel').value.trim(),spz:document.getElementById('vehicleSPZ').value.trim(),vin:document.getElementById('vehicleVIN').value.trim(),palivo:document.getElementById('vehiclePalivo').value,pocTacho:Number(document.getElementById('vehiclePocTacho').value)||0,sazba:Number(document.getElementById('vehicleSazba').value)||5.60,ridic:document.getElementById('vehicleRidic').value.trim()};saveVehicle();toast('Vozidlo uloženo');renderHeader();showScreen('home');}
+function bindEvents(){document.getElementById('prevMonth').addEventListener('click',()=>{state.currentMonth--;if(state.currentMonth<0){state.currentMonth=11;state.currentYear--;}render();});document.getElementById('nextMonth').addEventListener('click',()=>{state.currentMonth++;if(state.currentMonth>11){state.currentMonth=0;state.currentYear++;}render();});document.getElementById('fabAdd').addEventListener('click',()=>openTripModal());document.querySelectorAll('.nav-item').forEach(n=>{n.addEventListener('click',()=>{const s=n.dataset.screen;if(s==='home')showScreen('home');else if(s==='vehicle'){loadVehicleForm();showScreen('vehicle');}else{toast('Tato sekce bude dostupná v dalším kroku');}});});document.getElementById('tripModalClose').addEventListener('click',closeTripModal);document.getElementById('tripCancel').addEventListener('click',closeTripModal);document.getElementById('tripSave').addEventListener('click',saveTrip);document.getElementById('tripDelete').addEventListener('click',deleteTrip);document.querySelectorAll('.purpose-toggle button').forEach(b=>{b.addEventListener('click',()=>setPurpose(b.dataset.purpose));});document.getElementById('detailModalClose').addEventListener('click',closeDetailModal);document.getElementById('detailDone').addEventListener('click',closeDetailModal);document.getElementById('detailEdit').addEventListener('click',(e)=>{closeDetailModal();openTripModal(e.target.dataset.id);});document.getElementById('saveVehicle').addEventListener('click',saveVehicleForm);document.querySelectorAll('.modal-overlay').forEach(o=>{o.addEventListener('click',(e)=>{if(e.target===o)o.classList.remove('show');});});}
+loadData();bindEvents();render();
+if(!state.vehicle){loadVehicleForm();showScreen('vehicle');toast('Vítejte! Nastavte prosím vaše vozidlo.',3500);}
+</script>
+</body>
+</html>
