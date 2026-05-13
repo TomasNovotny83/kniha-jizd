@@ -93,6 +93,7 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
 .btn-primary{background:var(--primary);color:white;}
 .btn-secondary{background:var(--gray-100);color:var(--gray-700);}
 .btn-danger{background:var(--red-bg);color:var(--red);}
+.btn-warning{background:var(--warn-bg);color:var(--warn);}
 .detail-row{padding:12px 0;border-bottom:1px solid var(--gray-100);display:flex;justify-content:space-between;align-items:center;gap:12px;}
 .detail-row:last-child{border-bottom:none;}
 .detail-label{font-size:13px;color:var(--gray-500);font-weight:500;}
@@ -117,12 +118,15 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
 .banner-icon{font-size:18px;flex-shrink:0;}
 .banner-close{background:none;border:none;color:inherit;cursor:pointer;font-size:18px;opacity:0.7;font-family:inherit;}
 .tacho-locked-icon{font-size:11px;color:var(--gray-500);margin-left:6px;font-weight:500;}
+.admin-section{background:white;padding:20px;max-width:600px;margin:20px auto 0;border-top:1px solid var(--gray-200);}
+.admin-section h3{font-size:13px;color:var(--gray-500);margin-bottom:12px;text-transform:uppercase;letter-spacing:0.5px;}
+.admin-btn{width:100%;margin-top:8px;}
 </style>
 </head>
 <body>
 <div class="header">
 <div class="header-content">
-<div class="header-title">🚗 Kniha jízd<span class="version-tag">v5</span></div>
+<div class="header-title">🚗 Kniha jízd<span class="version-tag">v6</span></div>
 <div class="header-subtitle" id="vehicleSubtitle">Nastavte vozidlo →</div>
 </div>
 <div class="month-selector">
@@ -161,6 +165,11 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
 </div>
 <div class="form-row"><label class="form-label">Řidič</label><input type="text" class="form-input" id="vehicleRidic" placeholder="Tomáš Novotný"></div>
 <button class="btn btn-primary" id="saveVehicle" style="width:100%;">Uložit vozidlo</button>
+</div>
+<div class="admin-section">
+<h3>⚙️ Údržba</h3>
+<button class="btn btn-warning admin-btn" id="btnResetTacho">🔄 Přepočítat všechny tachometry</button>
+<div class="tip-text" style="margin-top:8px;">Vymaže ručně nastavené tachometry a přepočítá řetězec od první jízdy.</div>
 </div>
 </div>
 <button class="fab" id="fabAdd">+</button>
@@ -227,7 +236,7 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
 <div class="toast" id="toast"></div>
 <script>
 'use strict';
-const state={trips:[],vehicle:null,currentMonth:new Date().getMonth(),currentYear:new Date().getFullYear(),currentScreen:'home',selectedPurpose:'Služební',autoFixedOnLoad:false,userOverrodeTacho:false};
+const state={trips:[],vehicle:null,currentMonth:new Date().getMonth(),currentYear:new Date().getFullYear(),currentScreen:'home',selectedPurpose:'Služební',userOverrodeTacho:false,initialTachoValue:null};
 const MONTHS_CS=['Leden','Únor','Březen','Duben','Květen','Červen','Červenec','Srpen','Září','Říjen','Listopad','Prosinec'];
 const MONTHS_CS_SHORT=['Led','Úno','Bře','Dub','Kvě','Čer','Črc','Srp','Zář','Říj','Lis','Pro'];
 function loadData(){try{const t=localStorage.getItem('kj_trips');state.trips=t?JSON.parse(t):[];const v=localStorage.getItem('kj_vehicle');state.vehicle=v?JSON.parse(v):null;
@@ -249,11 +258,25 @@ function getRouteFirst(route){const parts=getRouteParts(route);return parts[0]||
 function getRouteLast(route){const parts=getRouteParts(route);return parts[parts.length-1]||'';}
 function normalizeForCompare(s){return (s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim();}
 function routesNavazuji(prevRoute,currRoute){const prevLast=normalizeForCompare(getRouteLast(prevRoute));const currFirst=normalizeForCompare(getRouteFirst(currRoute));if(!prevLast||!currFirst)return true;return prevLast===currFirst||prevLast.includes(currFirst)||currFirst.includes(prevLast);}
-function recalcTachoChain(){if(state.trips.length===0)return;const sorted=sortedByDate(state.trips);let running=state.vehicle&&state.vehicle.pocTacho?Number(state.vehicle.pocTacho):0;
+function recalcTachoChain(){if(state.trips.length===0)return;const sorted=sortedByDate(state.trips);
+let running=state.vehicle&&state.vehicle.pocTacho?Number(state.vehicle.pocTacho):0;
 if(!running&&sorted.length>0){running=Number(sorted[0].tachoStart)||0;}
-for(let i=0;i<sorted.length;i++){const t=sorted[i];if(t.tachoManual){running=Number(t.tachoStart)||running;}else{t.tachoStart=running;}
+for(let i=0;i<sorted.length;i++){const t=sorted[i];
+  if(i===0){
+    if(state.vehicle&&state.vehicle.pocTacho){t.tachoStart=Number(state.vehicle.pocTacho);}
+    running=Number(t.tachoStart)||running;
+  }else if(t.tachoManual){
+    running=Number(t.tachoStart)||running;
+  }else{
+    t.tachoStart=running;
+  }
   running=tachoEnd(t);}
 saveTrips();}
+function resetAllTacho(){if(!confirm('Opravdu přepočítat všechny tachometry? Všechny ručně nastavené hodnoty se nahradí auto-výpočtem.'))return;
+state.trips.forEach(t=>{delete t.tachoManual;});
+recalcTachoChain();
+render();
+toast('Všechny tachometry přepočítány');}
 function validateTrip(trip,allTrips){const issues={errors:[],warnings:[]};
 if(trip.dateEnd&&trip.dateStart&&trip.dateEnd<trip.dateStart){issues.errors.push({type:'date',msg:'Datum konce je dřív než datum začátku'});}
 const otherTrips=allTrips.filter(t=>t.id!==trip.id);
@@ -275,12 +298,9 @@ function renderStats(){const trips=tripsThisMonth();const km=trips.reduce((s,t)=
 function renderBanner(){const banner=document.getElementById('problemBanner');const trips=tripsThisMonth();let errorCount=0,warnCount=0;
 trips.forEach(t=>{const v=validateTrip(t,state.trips);errorCount+=v.errors.length;warnCount+=v.warnings.length;});
 let html='';
-if(state.autoFixedOnLoad){html+=`<div class="banner success"><span class="banner-icon">✓</span><div style="flex:1;">Tachometr byl automaticky přepočítán.</div><button class="banner-close" onclick="closeAutoFixBanner()">✕</button></div>`;}
 if(errorCount>0){html+=`<div class="banner error"><span class="banner-icon">⚠️</span><div style="flex:1;"><b>${errorCount} chyb${errorCount>1?'':'a'}</b> v tomto měsíci.</div></div>`;}
 if(warnCount>0&&errorCount===0){html+=`<div class="banner warning"><span class="banner-icon">⚠️</span><div style="flex:1;"><b>${warnCount} upozornění</b> v tomto měsíci.</div></div>`;}
 banner.innerHTML=html;}
-function closeAutoFixBanner(){state.autoFixedOnLoad=false;renderBanner();}
-window.closeAutoFixBanner=closeAutoFixBanner;
 function renderTrips(){const list=document.getElementById('tripList');
 const sortedAsc=sortedByDate(tripsThisMonth());
 const trips=[...sortedAsc].reverse();
@@ -293,12 +313,12 @@ let cls='trip';let issueHtml='';
 if(issues.errors.length>0){cls+=' has-error';issueHtml=`<div class="trip-issue error">⚠️ ${issues.errors[0].msg}</div>`;}
 else if(issues.warnings.length>0){cls+=' has-warning';issueHtml=`<div class="trip-issue warning">⚠️ ${issues.warnings[0].msg}</div>`;}
 const sameDay=byDate[t.dateStart]||[];
-const sameDayIdx=sameDay.findIndex(x=>x.id===t.id);
+const sameDayIdxAsc=sameDay.findIndex(x=>x.id===t.id);
 const showReorder=sameDay.length>1;
-const canUp=showReorder&&sameDayIdx>0;
-const canDown=showReorder&&sameDayIdx<sameDay.length-1;
+const canUp=showReorder&&sameDayIdxAsc<sameDay.length-1;
+const canDown=showReorder&&sameDayIdxAsc>0;
 let reorderHtml='';
-if(showReorder){reorderHtml=`<div class="trip-reorder"><button class="reorder-btn" onclick="moveTripWithinDay('${t.id}',-1);event.stopPropagation();" ${canUp?'':'disabled'} title="Posunout v rámci dne dříve">↑</button><button class="reorder-btn" onclick="moveTripWithinDay('${t.id}',1);event.stopPropagation();" ${canDown?'':'disabled'} title="Posunout v rámci dne později">↓</button></div>`;}
+if(showReorder){reorderHtml=`<div class="trip-reorder"><button class="reorder-btn" onclick="moveTripVisually('${t.id}','up');event.stopPropagation();" ${canUp?'':'disabled'} title="Posunout výš v seznamu">↑</button><button class="reorder-btn" onclick="moveTripVisually('${t.id}','down');event.stopPropagation();" ${canDown?'':'disabled'} title="Posunout níž v seznamu">↓</button></div>`;}
 return `<div class="${cls}" data-id="${t.id}">
 <div class="trip-content" onclick="showDetail('${t.id}')">
 <div class="trip-date"><div class="trip-day">${d.getDate()}</div><div class="trip-month">${MONTHS_CS_SHORT[d.getMonth()]}</div></div>
@@ -306,10 +326,10 @@ return `<div class="${cls}" data-id="${t.id}">
 </div>
 ${reorderHtml}
 </div>`;}).join('');}
-function moveTripWithinDay(id,direction){const trip=state.trips.find(t=>t.id===id);if(!trip)return;
+function moveTripVisually(id,direction){const trip=state.trips.find(t=>t.id===id);if(!trip)return;
 const sameDay=sortedByDate(state.trips.filter(t=>t.dateStart===trip.dateStart));
 const idx=sameDay.findIndex(t=>t.id===id);
-const targetIdx=idx+direction;
+const targetIdx=direction==='up'?idx+1:idx-1;
 if(targetIdx<0||targetIdx>=sameDay.length)return;
 const other=sameDay[targetIdx];
 const tmp=trip.sortOrder;
@@ -318,8 +338,8 @@ other.sortOrder=tmp;
 recalcTachoChain();
 saveTrips();
 render();
-toast(direction<0?'Posunuto dřív':'Posunuto později');}
-window.moveTripWithinDay=moveTripWithinDay;
+toast(direction==='up'?'Posunuto výš':'Posunuto níž');}
+window.moveTripVisually=moveTripVisually;
 window.showDetail=showDetail;
 function render(){renderHeader();renderStats();renderBanner();renderTrips();}
 function showScreen(name){state.currentScreen=name;document.querySelectorAll('[id^="screen-"]').forEach(s=>s.style.display='none');document.getElementById('screen-'+name).style.display='';document.querySelectorAll('.nav-item').forEach(n=>{n.classList.toggle('active',n.dataset.screen===name);});document.getElementById('fabAdd').style.display=(name==='home')?'':'none';}
@@ -332,10 +352,11 @@ let newTacho;
 if(prev){newTacho=tachoEnd(prev);}
 else if(state.vehicle&&state.vehicle.pocTacho){newTacho=Number(state.vehicle.pocTacho);}
 else{newTacho=0;}
-document.getElementById('tripTachoStart').value=newTacho;}
-function openTripModal(tripId=null){state.userOverrodeTacho=false;const modal=document.getElementById('tripModal');document.getElementById('tripId').value=tripId||'';document.getElementById('tripModalTitle').textContent=tripId?'Upravit jízdu':'Nová jízda';document.getElementById('tripDelete').style.display=tripId?'':'none';
+document.getElementById('tripTachoStart').value=newTacho;
+state.initialTachoValue=newTacho;}
+function openTripModal(tripId=null){state.userOverrodeTacho=false;state.initialTachoValue=null;const modal=document.getElementById('tripModal');document.getElementById('tripId').value=tripId||'';document.getElementById('tripModalTitle').textContent=tripId?'Upravit jízdu':'Nová jízda';document.getElementById('tripDelete').style.display=tripId?'':'none';
 clearHints();
-if(tripId){const t=state.trips.find(x=>x.id===tripId);if(t){document.getElementById('tripDateStart').value=t.dateStart||'';document.getElementById('tripDateEnd').value=t.dateEnd||t.dateStart||'';document.getElementById('tripRoute').value=t.route||'';document.getElementById('tripTachoStart').value=t.tachoStart||'';document.getElementById('tripDistance').value=t.distance||'';document.getElementById('tripNote').value=t.note||'';setPurpose(t.purpose||'Služební');state.userOverrodeTacho=!!t.tachoManual;updateTachoLabel();}}
+if(tripId){const t=state.trips.find(x=>x.id===tripId);if(t){document.getElementById('tripDateStart').value=t.dateStart||'';document.getElementById('tripDateEnd').value=t.dateEnd||t.dateStart||'';document.getElementById('tripRoute').value=t.route||'';document.getElementById('tripTachoStart').value=t.tachoStart||'';document.getElementById('tripDistance').value=t.distance||'';document.getElementById('tripNote').value=t.note||'';setPurpose(t.purpose||'Služební');state.userOverrodeTacho=!!t.tachoManual;state.initialTachoValue=Number(t.tachoStart)||0;updateTachoLabel();}}
 else{const today=todayISO();document.getElementById('tripDateStart').value=today;document.getElementById('tripDateEnd').value=today;document.getElementById('tripRoute').value='';document.getElementById('tripNote').value='';document.getElementById('tripDistance').value='';setPurpose('Služební');autoFillTachoStart();updateTachoLabel();}
 modal.classList.add('show');setTimeout(validateLiveTrip,100);}
 function updateTachoLabel(){const lbl=document.getElementById('tachoAutoLabel');if(state.userOverrodeTacho){lbl.textContent='(ručně)';lbl.style.color='var(--orange)';}else{lbl.textContent='(auto)';lbl.style.color='var(--gray-500)';}}
@@ -352,7 +373,9 @@ const id=document.getElementById('tripId').value;
 if(!dateStart)return;
 if(dateEnd&&dateEnd<dateStart){document.getElementById('tripDateEnd').classList.add('has-error');document.getElementById('dateHint').innerHTML=`<div class="field-hint error"><span>❌</span><div>Datum konce nemůže být dříve než datum začátku.</div></div>`;}
 const otherTrips=state.trips.filter(t=>t.id!==id);
-const tempTrip={id:id||'_new',dateStart,dateEnd:dateEnd||dateStart,tachoStart,distance,route,sortOrder:99999};
+const existingThis=id?state.trips.find(t=>t.id===id):null;
+const myOrder=existingThis?existingThis.sortOrder:99999;
+const tempTrip={id:id||'_new',dateStart,dateEnd:dateEnd||dateStart,tachoStart,distance,route,sortOrder:myOrder};
 const sorted=sortedByDate([...otherTrips,tempTrip]);
 const myIdx=sorted.findIndex(t=>t.id===tempTrip.id);
 const prev=myIdx>0?sorted[myIdx-1]:null;
@@ -362,15 +385,15 @@ const hintEl=document.getElementById('tachoHint');
 const routeEl=document.getElementById('tripRoute');
 const routeHintEl=document.getElementById('routeHint');
 if(prev){const prevEnd=tachoEnd(prev);
-  if(tachoStart<prevEnd){tachoEl.classList.add('has-error');hintEl.innerHTML=`<div class="field-hint error"><span>❌</span><div><b>Tacho jde zpět!</b> Předchozí (${formatDateShort(prev.dateStart)}) končila ${fmtNumber(prevEnd)} km.</div><button class="hint-action" type="button" onclick="applyTachoFix(${prevEnd})">Opravit</button></div>`;}
-  else if(tachoStart>prevEnd){const gap=tachoStart-prevEnd;tachoEl.classList.add('has-warning');hintEl.innerHTML=`<div class="field-hint warning"><span>⚠️</span><div><b>Mezera ${fmtNumber(gap)} km.</b> Předchozí (${formatDateShort(prev.dateStart)}) končila ${fmtNumber(prevEnd)} km.</div><button class="hint-action" type="button" onclick="applyTachoFix(${prevEnd})">Opravit</button></div>`;}
+  if(tachoStart<prevEnd){tachoEl.classList.add('has-error');hintEl.innerHTML=`<div class="field-hint error"><span>❌</span><div><b>Tacho jde zpět!</b> Předchozí (${formatDateShort(prev.dateStart)}: ${escapeHtml(prev.route||'')}) končila ${fmtNumber(prevEnd)} km.</div><button class="hint-action" type="button" onclick="applyTachoFix(${prevEnd})">Opravit</button></div>`;}
+  else if(tachoStart>prevEnd){const gap=tachoStart-prevEnd;tachoEl.classList.add('has-warning');hintEl.innerHTML=`<div class="field-hint warning"><span>⚠️</span><div><b>Mezera ${fmtNumber(gap)} km.</b> Předchozí (${formatDateShort(prev.dateStart)}: ${escapeHtml(prev.route||'')}) končila ${fmtNumber(prevEnd)} km.</div><button class="hint-action" type="button" onclick="applyTachoFix(${prevEnd})">Opravit</button></div>`;}
   else{hintEl.innerHTML=`<div class="field-hint info"><span>✓</span><div>Tachometr navazuje na předchozí jízdu (${formatDateShort(prev.dateStart)}).</div></div>`;}
   if(prev.route&&route&&getRouteParts(prev.route).length>=1&&getRouteParts(route).length>=1){if(!routesNavazuji(prev.route,route)){routeEl.classList.add('has-warning');const prevLast=getRouteLast(prev.route);routeHintEl.innerHTML=`<div class="field-hint warning"><span>⚠️</span><div>Předchozí jízda končila <b>${escapeHtml(prevLast)}</b>. Tato by měla začínat stejně.</div></div>`;}}}
 if(next&&route&&next.route){if(!routesNavazuji(route,next.route)){const nextFirst=getRouteFirst(next.route);if(!routeEl.classList.contains('has-warning')){routeEl.classList.add('has-warning');}const existing=routeHintEl.innerHTML;routeHintEl.innerHTML=existing+`<div class="field-hint warning" style="margin-top:6px;"><span>⚠️</span><div>Následující jízda začíná <b>${escapeHtml(nextFirst)}</b>. Tato by tam měla končit.</div></div>`;}}
 const days=dateEnd&&dateStart?Math.max(1,Math.round((parseISO(dateEnd)-parseISO(dateStart))/86400000)+1):1;
 const kmDay=distance/days;
 if(kmDay>1000){const w=`<div class="field-hint warning"><span>⚠️</span><div>Vzdálenost <b>${fmtNumber(kmDay)} km/den</b> je neobvykle vysoká.</div></div>`;hintEl.innerHTML+=w;}}
-function applyTachoFix(val){document.getElementById('tripTachoStart').value=val;state.userOverrodeTacho=false;updateTachoLabel();validateLiveTrip();}
+function applyTachoFix(val){document.getElementById('tripTachoStart').value=val;state.userOverrodeTacho=false;state.initialTachoValue=val;updateTachoLabel();validateLiveTrip();}
 window.applyTachoFix=applyTachoFix;
 function getNextSortOrder(){let max=0;state.trips.forEach(t=>{if(typeof t.sortOrder==='number'&&t.sortOrder>max)max=t.sortOrder;});return max+1;}
 function saveTrip(){const id=document.getElementById('tripId').value;const dateStart=document.getElementById('tripDateStart').value;const route=document.getElementById('tripRoute').value.trim();
@@ -388,7 +411,7 @@ const issues=validateTrip(t,state.trips);
 let issuesHtml='';
 issues.errors.forEach(e=>{issuesHtml+=`<div class="field-hint error" style="margin-bottom:8px;"><span>❌</span><div>${e.msg}</div></div>`;});
 issues.warnings.forEach(w=>{issuesHtml+=`<div class="field-hint warning" style="margin-bottom:8px;"><span>⚠️</span><div>${w.msg}</div></div>`;});
-document.getElementById('detailBody').innerHTML=issuesHtml+`<div class="detail-row"><span class="detail-label">Datum</span><span class="detail-value">${d.getDate()}. ${MONTHS_CS_SHORT[d.getMonth()]}. ${d.getFullYear()}</span></div><div class="detail-row"><span class="detail-label">Trasa</span><span class="detail-value" style="max-width:60%;">${escapeHtml(t.route)}</span></div><div class="detail-row"><span class="detail-label">Účel</span><span class="detail-value"><span class="badge ${t.purpose==='Soukromá'?'badge-soukroma':'badge-sluzebni'}">${t.purpose}</span></span></div><div class="detail-row"><span class="detail-label">Tacho start</span><span class="detail-value">${fmtNumber(t.tachoStart)} km</span></div><div class="detail-row"><span class="detail-label">Tacho konec</span><span class="detail-value">${fmtNumber(te)} km</span></div><div class="detail-row"><span class="detail-label">Vzdálenost</span><span class="detail-value">${fmtNumber(t.distance)} km</span></div>${nahrada>0?`<div class="detail-row"><span class="detail-label">Náhrada</span><span class="detail-value">${fmtCurrency(nahrada)}</span></div>`:''}${t.note?`<div class="detail-row" style="flex-direction:column;align-items:flex-start;"><span class="detail-label" style="margin-bottom:6px;">Poznámka</span><span class="detail-value" style="text-align:left;font-weight:400;color:var(--gray-700);">${escapeHtml(t.note)}</span></div>`:''}`;
+document.getElementById('detailBody').innerHTML=issuesHtml+`<div class="detail-row"><span class="detail-label">Datum</span><span class="detail-value">${d.getDate()}. ${MONTHS_CS_SHORT[d.getMonth()]}. ${d.getFullYear()}</span></div><div class="detail-row"><span class="detail-label">Trasa</span><span class="detail-value" style="max-width:60%;">${escapeHtml(t.route)}</span></div><div class="detail-row"><span class="detail-label">Účel</span><span class="detail-value"><span class="badge ${t.purpose==='Soukromá'?'badge-soukroma':'badge-sluzebni'}">${t.purpose}</span></span></div><div class="detail-row"><span class="detail-label">Tacho start</span><span class="detail-value">${fmtNumber(t.tachoStart)} km${t.tachoManual?' <small style="color:var(--orange);">(ručně)</small>':''}</span></div><div class="detail-row"><span class="detail-label">Tacho konec</span><span class="detail-value">${fmtNumber(te)} km</span></div><div class="detail-row"><span class="detail-label">Vzdálenost</span><span class="detail-value">${fmtNumber(t.distance)} km</span></div>${nahrada>0?`<div class="detail-row"><span class="detail-label">Náhrada</span><span class="detail-value">${fmtCurrency(nahrada)}</span></div>`:''}${t.note?`<div class="detail-row" style="flex-direction:column;align-items:flex-start;"><span class="detail-label" style="margin-bottom:6px;">Poznámka</span><span class="detail-value" style="text-align:left;font-weight:400;color:var(--gray-700);">${escapeHtml(t.note)}</span></div>`:''}`;
 document.getElementById('detailEdit').dataset.id=id;document.getElementById('detailModal').classList.add('show');}
 function closeDetailModal(){document.getElementById('detailModal').classList.remove('show');}
 function loadVehicleForm(){const v=state.vehicle||{};document.getElementById('vehicleZnacka').value=v.znacka||'';document.getElementById('vehicleModel').value=v.model||'';document.getElementById('vehicleSPZ').value=v.spz||'';document.getElementById('vehicleVIN').value=v.vin||'';document.getElementById('vehiclePalivo').value=v.palivo||'Nafta';document.getElementById('vehiclePocTacho').value=v.pocTacho||'';document.getElementById('vehicleSazba').value=v.sazba||'5.60';document.getElementById('vehicleRidic').value=v.ridic||'';}
@@ -411,8 +434,10 @@ input.value=newVal;
 const newCursor=cleanBefore.length+(cleanBefore?1:0)+1+(cleanAfter?1:0);
 input.setSelectionRange(newCursor,newCursor);
 validateLiveTrip();}
-function onTachoManualEdit(){state.userOverrodeTacho=true;updateTachoLabel();validateLiveTrip();}
-function bindEvents(){document.getElementById('prevMonth').addEventListener('click',()=>{state.currentMonth--;if(state.currentMonth<0){state.currentMonth=11;state.currentYear--;}render();});document.getElementById('nextMonth').addEventListener('click',()=>{state.currentMonth++;if(state.currentMonth>11){state.currentMonth=0;state.currentYear++;}render();});document.getElementById('fabAdd').addEventListener('click',()=>openTripModal());document.querySelectorAll('.nav-item').forEach(n=>{n.addEventListener('click',()=>{const s=n.dataset.screen;if(s==='home')showScreen('home');else if(s==='vehicle'){loadVehicleForm();showScreen('vehicle');}else{toast('Tato sekce bude dostupná v dalším kroku');}});});document.getElementById('tripModalClose').addEventListener('click',closeTripModal);document.getElementById('tripCancel').addEventListener('click',closeTripModal);document.getElementById('tripSave').addEventListener('click',saveTrip);document.getElementById('tripDelete').addEventListener('click',deleteTrip);document.querySelectorAll('.purpose-toggle button').forEach(b=>{b.addEventListener('click',()=>setPurpose(b.dataset.purpose));});document.getElementById('detailModalClose').addEventListener('click',closeDetailModal);document.getElementById('detailDone').addEventListener('click',closeDetailModal);document.getElementById('detailEdit').addEventListener('click',(e)=>{closeDetailModal();openTripModal(e.target.dataset.id);});document.getElementById('saveVehicle').addEventListener('click',saveVehicleForm);document.querySelectorAll('.modal-overlay').forEach(o=>{o.addEventListener('click',(e)=>{if(e.target===o)o.classList.remove('show');});});document.getElementById('btnInsertArrow').addEventListener('click',insertArrow);document.getElementById('btnSwapRoute').addEventListener('click',swapRoute);document.getElementById('btnClearRoute').addEventListener('click',clearRoute);
+function onTachoManualEdit(){const currentVal=Number(document.getElementById('tripTachoStart').value)||0;
+if(state.initialTachoValue!==null&&currentVal!==state.initialTachoValue){state.userOverrodeTacho=true;}else{state.userOverrodeTacho=false;}
+updateTachoLabel();validateLiveTrip();}
+function bindEvents(){document.getElementById('prevMonth').addEventListener('click',()=>{state.currentMonth--;if(state.currentMonth<0){state.currentMonth=11;state.currentYear--;}render();});document.getElementById('nextMonth').addEventListener('click',()=>{state.currentMonth++;if(state.currentMonth>11){state.currentMonth=0;state.currentYear++;}render();});document.getElementById('fabAdd').addEventListener('click',()=>openTripModal());document.querySelectorAll('.nav-item').forEach(n=>{n.addEventListener('click',()=>{const s=n.dataset.screen;if(s==='home')showScreen('home');else if(s==='vehicle'){loadVehicleForm();showScreen('vehicle');}else{toast('Tato sekce bude dostupná v dalším kroku');}});});document.getElementById('tripModalClose').addEventListener('click',closeTripModal);document.getElementById('tripCancel').addEventListener('click',closeTripModal);document.getElementById('tripSave').addEventListener('click',saveTrip);document.getElementById('tripDelete').addEventListener('click',deleteTrip);document.querySelectorAll('.purpose-toggle button').forEach(b=>{b.addEventListener('click',()=>setPurpose(b.dataset.purpose));});document.getElementById('detailModalClose').addEventListener('click',closeDetailModal);document.getElementById('detailDone').addEventListener('click',closeDetailModal);document.getElementById('detailEdit').addEventListener('click',(e)=>{closeDetailModal();openTripModal(e.target.dataset.id);});document.getElementById('saveVehicle').addEventListener('click',saveVehicleForm);document.getElementById('btnResetTacho').addEventListener('click',resetAllTacho);document.querySelectorAll('.modal-overlay').forEach(o=>{o.addEventListener('click',(e)=>{if(e.target===o)o.classList.remove('show');});});document.getElementById('btnInsertArrow').addEventListener('click',insertArrow);document.getElementById('btnSwapRoute').addEventListener('click',swapRoute);document.getElementById('btnClearRoute').addEventListener('click',clearRoute);
 const routeInput=document.getElementById('tripRoute');
 routeInput.addEventListener('input',autoConvertArrow);
 routeInput.addEventListener('input',validateLiveTrip);
@@ -421,10 +446,6 @@ document.getElementById('tripDateEnd').addEventListener('change',validateLiveTri
 document.getElementById('tripDistance').addEventListener('input',validateLiveTrip);
 document.getElementById('tripTachoStart').addEventListener('input',onTachoManualEdit);}
 loadData();
-const beforeJson=JSON.stringify(state.trips);
-recalcTachoChain();
-const afterJson=JSON.stringify(state.trips);
-if(beforeJson!==afterJson){state.autoFixedOnLoad=true;}
 bindEvents();render();
 if(!state.vehicle){loadVehicleForm();showScreen('vehicle');toast('Vítejte! Nastavte prosím vaše vozidlo.',3500);}
 </script>
