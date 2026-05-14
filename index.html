@@ -124,6 +124,31 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
 .banner-icon{font-size:18px;flex-shrink:0;}
 .banner-close{background:none;border:none;color:inherit;cursor:pointer;font-size:18px;opacity:0.7;font-family:inherit;}
 .tacho-locked-icon{font-size:11px;color:var(--gray-500);margin-left:6px;font-weight:500;}
+.fav-search{width:100%;padding:12px 16px;font-size:16px;border:1.5px solid var(--gray-200);border-radius:12px;background:white;font-family:inherit;margin-bottom:4px;-webkit-appearance:none;}
+.fav-search:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 3px rgba(31,56,100,0.1);}
+.fav-cat-group{margin-top:18px;}
+.fav-cat-title{font-size:12px;font-weight:700;color:var(--gray-500);text-transform:uppercase;letter-spacing:0.5px;padding:0 4px 8px;display:flex;align-items:center;gap:8px;}
+.fav-cat-title .cat-count{background:var(--gray-200);color:var(--gray-700);border-radius:10px;padding:1px 8px;font-size:11px;}
+.fav-item{background:white;border:1.5px solid var(--gray-200);border-radius:12px;padding:14px 16px;margin-bottom:8px;cursor:pointer;display:flex;gap:12px;align-items:center;}
+.fav-item:active{background:var(--gray-100);transform:scale(0.99);}
+.fav-item-main{flex:1;min-width:0;}
+.fav-item-name{font-size:15px;font-weight:600;color:var(--gray-900);margin-bottom:4px;line-height:1.3;}
+.fav-item-meta{display:flex;gap:10px;align-items:center;flex-wrap:wrap;font-size:12px;color:var(--gray-500);}
+.fav-item-note{font-size:12px;color:var(--gray-500);margin-top:4px;font-style:italic;}
+.fav-usage{background:var(--primary-bg);color:var(--primary);border-radius:8px;padding:2px 8px;font-size:11px;font-weight:700;}
+.fav-empty{padding:40px 20px;text-align:center;color:var(--gray-500);}
+.fav-empty-icon{font-size:44px;margin-bottom:10px;opacity:0.3;}
+.cat-pills{display:flex;gap:6px;flex-wrap:wrap;}
+.cat-pill{padding:8px 14px;border:1.5px solid var(--gray-200);background:white;border-radius:10px;font-size:13px;font-weight:600;color:var(--gray-500);cursor:pointer;font-family:inherit;}
+.cat-pill.active{background:var(--primary);color:white;border-color:var(--primary);}
+.fav-picker-item{background:white;border:1.5px solid var(--gray-200);border-radius:10px;padding:12px 14px;margin-bottom:6px;cursor:pointer;}
+.fav-picker-item:active{background:var(--primary-bg);border-color:var(--primary);}
+.fav-picker-name{font-size:14px;font-weight:600;color:var(--gray-900);}
+.fav-picker-meta{font-size:12px;color:var(--gray-500);margin-top:2px;}
+.btn-fav-save{background:var(--green-bg);color:var(--green);border:1.5px solid transparent;border-radius:10px;padding:8px 14px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:4px;}
+.btn-fav-save:active{background:var(--green);color:white;transform:scale(0.95);}
+.btn-fav-pick{background:#FEF3C7;color:var(--warn);border:1.5px solid transparent;border-radius:10px;padding:8px 14px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:4px;}
+.btn-fav-pick:active{background:var(--warn);color:white;transform:scale(0.95);}
 .admin-section{background:white;padding:20px;max-width:600px;margin:20px auto 0;border-top:1px solid var(--gray-200);}
 .admin-section h3{font-size:13px;color:var(--gray-500);margin-bottom:12px;text-transform:uppercase;letter-spacing:0.5px;}
 .admin-btn{width:100%;margin-top:8px;}
@@ -132,7 +157,7 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
 <body>
 <div class="header">
 <div class="header-content">
-<div class="header-title">🚗 Kniha jízd<span class="version-tag">v9</span></div>
+<div class="header-title">🚗 Kniha jízd<span class="version-tag">v10</span></div>
 <div class="header-subtitle" id="vehicleSubtitle">Nastavte vozidlo →</div>
 </div>
 <div class="month-selector">
@@ -178,6 +203,13 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
 <div class="tip-text" style="margin-top:8px;">Vymaže ručně nastavené tachometry a přepočítá řetězec od první jízdy.</div>
 </div>
 </div>
+<div id="screen-trasy" style="display:none;">
+<div class="setup" style="padding:24px 20px 12px;"><h2 style="font-size:22px;">⭐ Oblíbené trasy</h2><p style="margin-bottom:0;">Uložené trasy pro rychlé zadávání jízd</p></div>
+<div style="background:white;padding:16px 20px 20px;max-width:600px;margin:0 auto;min-height:60vh;">
+<input type="text" class="fav-search" id="favSearch" placeholder="🔍 Hledat trasu...">
+<div id="favList"></div>
+</div>
+</div>
 <button class="fab" id="fabAdd">+</button>
 <div class="bottom-nav">
 <div class="nav-item active" data-screen="home"><span class="nav-icon">📋</span><span class="nav-label">Jízdy</span></div>
@@ -206,6 +238,10 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
 <button type="button" class="route-tool-btn" id="btnClearRoute">✕ smazat</button>
 </div>
 <div id="routeSuggestions"></div>
+<div class="route-tools" style="margin-top:8px;">
+<button type="button" class="btn-fav-pick" id="btnPickFav">⭐ Vybrat z oblíbených</button>
+<button type="button" class="btn-fav-save" id="btnSaveFav">💾 Uložit jako oblíbenou</button>
+</div>
 <div class="tip-text">💡 Tip: napište <b>--</b> a automaticky se převede na →</div>
 <div id="routeHint"></div>
 </div>
@@ -241,17 +277,68 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
 </div>
 </div>
 </div>
+<div class="modal-overlay" id="favEditModal">
+<div class="modal">
+<div class="modal-header"><div class="modal-title" id="favEditTitle">Nová oblíbená trasa</div><button class="modal-close" id="favEditClose">✕</button></div>
+<div class="modal-body">
+<input type="hidden" id="favId">
+<div class="form-row">
+<label class="form-label">Název trasy</label>
+<div class="route-input-wrap">
+<input type="text" class="form-input" id="favRoute" placeholder="Např: Michalovice → SoliCAD">
+<div class="route-tools">
+<button type="button" class="route-tool-btn" id="favBtnArrow"><span class="icon">→</span>vložit šipku</button>
+<button type="button" class="route-tool-btn" id="favBtnSwap">🔄 prohodit</button>
+<button type="button" class="route-tool-btn" id="favBtnClear">✕ smazat</button>
+</div>
+<div class="tip-text">💡 Tip: napište <b>--</b> a automaticky se převede na →</div>
+</div>
+</div>
+<div class="form-row">
+<label class="form-label">Kategorie</label>
+<div class="cat-pills" id="favCatPills"></div>
+</div>
+<div class="form-row">
+<label class="form-label">Vzdálenost (km) <span class="tacho-locked-icon">nepovinné</span></label>
+<input type="number" class="form-input" id="favDistance" placeholder="Nechte prázdné = zadám ručně">
+<div class="tip-text">Když necháte prázdné, vzdálenost zadáte při každém použití zvlášť.</div>
+</div>
+<div class="form-row"><label class="form-label">Poznámka</label><textarea class="form-textarea" id="favNote" placeholder="Volný text..."></textarea></div>
+</div>
+<div class="modal-footer">
+<button class="btn btn-danger" id="favDelete" style="display:none;">Smazat</button>
+<button class="btn btn-secondary" id="favCancel">Zrušit</button>
+<button class="btn btn-primary" id="favSave">Uložit</button>
+</div>
+</div>
+</div>
+<div class="modal-overlay" id="favPickerModal">
+<div class="modal">
+<div class="modal-header"><div class="modal-title">⭐ Vybrat z oblíbených</div><button class="modal-close" id="favPickerClose">✕</button></div>
+<div class="modal-body">
+<input type="text" class="fav-search" id="favPickerSearch" placeholder="🔍 Hledat trasu...">
+<div id="favPickerList"></div>
+</div>
+<div class="modal-footer">
+<button class="btn btn-secondary" id="favPickerCancel">Zavřít</button>
+</div>
+</div>
+</div>
 <div class="toast" id="toast"></div>
 <script>
 'use strict';
-const state={trips:[],vehicle:null,currentMonth:new Date().getMonth(),currentYear:new Date().getFullYear(),currentScreen:'home',selectedPurpose:'Služební',userOverrodeTacho:false,initialTachoValue:null,userEditedDateEnd:false,lastCursorPos:null};
+const state={trips:[],vehicle:null,favRoutes:[],currentMonth:new Date().getMonth(),currentYear:new Date().getFullYear(),currentScreen:'home',selectedPurpose:'Služební',userOverrodeTacho:false,initialTachoValue:null,userEditedDateEnd:false,lastCursorPos:null,selectedFavCat:'Pravidelné',favSearchText:'',favPickerSearchText:''};
+const FAV_CATEGORIES=['Pravidelné','Klienti','Servis','Sklad','Soukromé','Ostatní'];
 const MONTHS_CS=['Leden','Únor','Březen','Duben','Květen','Červen','Červenec','Srpen','Září','Říjen','Listopad','Prosinec'];
 const MONTHS_CS_SHORT=['Led','Úno','Bře','Dub','Kvě','Čer','Črc','Srp','Zář','Říj','Lis','Pro'];
 function loadData(){try{const t=localStorage.getItem('kj_trips');state.trips=t?JSON.parse(t):[];const v=localStorage.getItem('kj_vehicle');state.vehicle=v?JSON.parse(v):null;
 let maxOrder=0;state.trips.forEach(t=>{if(typeof t.sortOrder==='number')maxOrder=Math.max(maxOrder,t.sortOrder);});
-state.trips.forEach(t=>{if(typeof t.sortOrder!=='number'){maxOrder++;t.sortOrder=maxOrder;}});}catch(e){console.error(e);}}
+state.trips.forEach(t=>{if(typeof t.sortOrder!=='number'){maxOrder++;t.sortOrder=maxOrder;}});
+const fr=localStorage.getItem('kj_routes');state.favRoutes=fr?JSON.parse(fr):[];
+state.favRoutes.forEach(r=>{if(!FAV_CATEGORIES.includes(r.category))r.category='Ostatní';if(typeof r.usageCount!=='number')r.usageCount=0;});}catch(e){console.error(e);}}
 function saveTrips(){localStorage.setItem('kj_trips',JSON.stringify(state.trips));}
 function saveVehicle(){localStorage.setItem('kj_vehicle',JSON.stringify(state.vehicle));}
+function saveFavRoutes(){localStorage.setItem('kj_routes',JSON.stringify(state.favRoutes));}
 function uid(){return Date.now().toString(36)+Math.random().toString(36).substr(2,5);}
 function toast(msg,duration=2000){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),duration);}
 function fmtCurrency(n){return (n||0).toLocaleString('cs-CZ',{minimumFractionDigits:2,maximumFractionDigits:2})+' Kč';}
@@ -261,7 +348,6 @@ function parseISO(s){return new Date(s+'T00:00:00');}
 function escapeHtml(s){const div=document.createElement('div');div.textContent=s||'';return div.innerHTML;}
 function escapeAttr(s){return (s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/'/g,'&#39;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 function sortedByDate(trips){return [...trips].sort((a,b)=>{const c=(a.dateStart||'').localeCompare(b.dateStart||'');if(c!==0)return c;
-// V9: within same day, sort by tachoStart (chain order), then sortOrder, then createdAt
 const ta=Number(a.tachoStart||0),tb=Number(b.tachoStart||0);if(ta!==tb)return ta-tb;
 const o=(a.sortOrder||0)-(b.sortOrder||0);if(o!==0)return o;return (a.createdAt||0)-(b.createdAt||0);});}
 function tachoEnd(trip){return Number(trip.tachoStart||0)+Number(trip.distance||0);}
@@ -272,8 +358,6 @@ function normalizeForCompare(s){return (s||'').toLowerCase().normalize('NFD').re
 function routesNavazuji(prevRoute,currRoute){const prevLast=normalizeForCompare(getRouteLast(prevRoute));const currFirst=normalizeForCompare(getRouteFirst(currRoute));if(!prevLast||!currFirst)return true;
 return prevLast===currFirst;}
 function recalcTachoChain(){if(state.trips.length===0)return;
-// V9: sort uses current tachoStart values as ordering hints (snapshot taken by sortedByDate).
-// Manual trips & first trip act as fixed anchors; auto trips flow from previous trip's end.
 const sorted=sortedByDate(state.trips);
 let running=state.vehicle&&state.vehicle.pocTacho?Number(state.vehicle.pocTacho):0;
 if(!running&&sorted.length>0){running=Number(sorted[0].tachoStart)||0;}
@@ -342,7 +426,6 @@ return `<div class="${cls}" data-id="${t.id}">
 </div>
 ${reorderHtml}
 </div>`;}).join('');
-// Bind events via delegation
 list.querySelectorAll('.trip-content').forEach(el=>{el.addEventListener('click',()=>showDetail(el.dataset.detailId));});
 list.querySelectorAll('.reorder-btn').forEach(btn=>{btn.addEventListener('click',(e)=>{e.stopPropagation();if(btn.disabled)return;moveTripVisually(btn.dataset.tripId,btn.dataset.moveDir);});});
 }
@@ -360,7 +443,8 @@ saveTrips();
 render();
 toast(direction==='up'?'Posunuto výš':'Posunuto níž');}
 function render(){renderHeader();renderStats();renderBanner();renderTrips();}
-function showScreen(name){state.currentScreen=name;document.querySelectorAll('[id^="screen-"]').forEach(s=>s.style.display='none');document.getElementById('screen-'+name).style.display='';document.querySelectorAll('.nav-item').forEach(n=>{n.classList.toggle('active',n.dataset.screen===name);});document.getElementById('fabAdd').style.display=(name==='home')?'':'none';}
+function showScreen(name){state.currentScreen=name;document.querySelectorAll('[id^="screen-"]').forEach(s=>s.style.display='none');document.getElementById('screen-'+name).style.display='';document.querySelectorAll('.nav-item').forEach(n=>{n.classList.toggle('active',n.dataset.screen===name);});
+document.getElementById('fabAdd').style.display=(name==='home'||name==='trasy')?'':'none';}
 function autoFillTachoStart(){const dateStart=document.getElementById('tripDateStart').value;const id=document.getElementById('tripId').value;if(!dateStart)return;
 const others=state.trips.filter(t=>t.id!==id);
 const beforeOrEqual=others.filter(t=>(t.dateStart||'')<=dateStart);
@@ -379,8 +463,6 @@ if(!dateStart){container.innerHTML='';return;}
 const others=state.trips.filter(t=>t.id!==id&&t.route);
 const existingThis=id?state.trips.find(t=>t.id===id):null;
 const myOrder=existingThis?existingThis.sortOrder:-1;
-// V9: include tachoStart so sortedByDate positions temp trip correctly within the day.
-// sortOrder=-1 for new trips ensures tie goes BEFORE existing same-tacho trip.
 const tachoStartNow=Number(document.getElementById('tripTachoStart').value)||0;
 const tempTrip={id:'_temp',dateStart,sortOrder:myOrder,tachoStart:tachoStartNow};
 const sorted=sortedByDate([...others,tempTrip]);
@@ -399,14 +481,12 @@ if(next&&next.route){const nextFirst=getRouteFirst(next.route);
   if(nextFirst&&normalizeForCompare(nextFirst)!==normalizeForCompare(currentLast)){
     buttons.push({label:`📍 Do: ${nextFirst}`,value:nextFirst,type:'end'});}}
 if(buttons.length===0){container.innerHTML='';return;}
-// V8.1 FIX: use data attributes and event delegation instead of inline onclick
 container.innerHTML=`<div class="route-suggestions">
 <span class="route-suggestions-label">💡 Návrhy podle sousedních jízd:</span>
 <div class="route-suggestion-btns">
 ${buttons.map((b,i)=>`<button type="button" class="route-suggestion-btn" data-suggest-type="${b.type}" data-suggest-value="${escapeAttr(b.value)}">${escapeHtml(b.label)}</button>`).join('')}
 </div>
 </div>`;
-// Bind click handlers via JS instead of inline onclick (avoids HTML escaping issues with quotes/commas)
 container.querySelectorAll('.route-suggestion-btn').forEach(btn=>{btn.addEventListener('click',(e)=>{e.preventDefault();applySuggestion(btn.dataset.suggestType,btn.dataset.suggestValue);});});}
 
 function applySuggestion(type,value){const input=document.getElementById('tripRoute');const current=input.value;
@@ -448,7 +528,6 @@ if(!dateStart)return;
 if(dateEnd&&dateEnd<dateStart){document.getElementById('tripDateEnd').classList.add('has-error');document.getElementById('dateHint').innerHTML=`<div class="field-hint error"><span>❌</span><div>Datum konce nemůže být dříve než datum začátku.</div></div>`;}
 const otherTrips=state.trips.filter(t=>t.id!==id);
 const existingThis=id?state.trips.find(t=>t.id===id):null;
-// V9: sortOrder=-1 for new trips so a tachoStart tie places the new trip BEFORE existing
 const myOrder=existingThis?existingThis.sortOrder:-1;
 const tempTrip={id:id||'_new',dateStart,dateEnd:dateEnd||dateStart,tachoStart,distance,route,sortOrder:myOrder};
 const sorted=sortedByDate([...otherTrips,tempTrip]);
@@ -488,17 +567,13 @@ if(next){const nextStart=Number(next.tachoStart||0);
 const days=dateEnd&&dateStart?Math.max(1,Math.round((parseISO(dateEnd)-parseISO(dateStart))/86400000)+1):1;
 const kmDay=distance/days;
 if(kmDay>1000){const w=`<div class="field-hint warning"><span>⚠️</span><div>Vzdálenost <b>${fmtNumber(kmDay)} km/den</b> je neobvykle vysoká.</div></div>`;hintEl.innerHTML+=w;}
-// Bind fix buttons inside hints
 document.querySelectorAll('[data-fix-tacho]').forEach(b=>{b.onclick=(e)=>{e.preventDefault();applyTachoFix(Number(b.dataset.fixTacho));};});
 }
 function applyTachoFix(val){document.getElementById('tripTachoStart').value=val;state.userOverrodeTacho=false;state.initialTachoValue=val;updateTachoLabel();validateLiveTrip();}
 function getNextSortOrder(){let max=0;state.trips.forEach(t=>{if(typeof t.sortOrder==='number'&&t.sortOrder>max)max=t.sortOrder;});return max+1;}
-// V9: for a NEW trip, pick a sortOrder so that if its tachoStart ties with an existing
-// same-day trip, the new trip sorts BEFORE the existing one. Otherwise tachoStart ordering wins.
 function computeSortOrderForNew(dateStart,tachoStart){
   const sameDay=state.trips.filter(t=>t.dateStart===dateStart);
   if(sameDay.length===0)return getNextSortOrder();
-  // existing same-day trips with tachoStart >= new trip's tachoStart: new trip must come before them
   const tiesOrAfter=sameDay.filter(t=>Number(t.tachoStart||0)>=Number(tachoStart||0));
   if(tiesOrAfter.length>0){
     let minOrder=Infinity;
@@ -551,7 +626,151 @@ validateLiveTrip();}
 function onTachoManualEdit(){const currentVal=Number(document.getElementById('tripTachoStart').value)||0;
 if(state.initialTachoValue!==null&&currentVal!==state.initialTachoValue){state.userOverrodeTacho=true;}else{state.userOverrodeTacho=false;}
 updateTachoLabel();validateLiveTrip();}
-function bindEvents(){document.getElementById('prevMonth').addEventListener('click',()=>{state.currentMonth--;if(state.currentMonth<0){state.currentMonth=11;state.currentYear--;}render();});document.getElementById('nextMonth').addEventListener('click',()=>{state.currentMonth++;if(state.currentMonth>11){state.currentMonth=0;state.currentYear++;}render();});document.getElementById('fabAdd').addEventListener('click',()=>openTripModal());document.querySelectorAll('.nav-item').forEach(n=>{n.addEventListener('click',()=>{const s=n.dataset.screen;if(s==='home')showScreen('home');else if(s==='vehicle'){loadVehicleForm();showScreen('vehicle');}else{toast('Tato sekce bude dostupná v dalším kroku');}});});document.getElementById('tripModalClose').addEventListener('click',closeTripModal);document.getElementById('tripCancel').addEventListener('click',closeTripModal);document.getElementById('tripSave').addEventListener('click',saveTrip);document.getElementById('tripDelete').addEventListener('click',deleteTrip);document.querySelectorAll('.purpose-toggle button').forEach(b=>{b.addEventListener('click',()=>setPurpose(b.dataset.purpose));});document.getElementById('detailModalClose').addEventListener('click',closeDetailModal);document.getElementById('detailDone').addEventListener('click',closeDetailModal);document.getElementById('detailEdit').addEventListener('click',(e)=>{closeDetailModal();openTripModal(e.target.dataset.id);});document.getElementById('saveVehicle').addEventListener('click',saveVehicleForm);document.getElementById('btnResetTacho').addEventListener('click',resetAllTacho);document.querySelectorAll('.modal-overlay').forEach(o=>{o.addEventListener('click',(e)=>{if(e.target===o)o.classList.remove('show');});});document.getElementById('btnInsertArrow').addEventListener('click',insertArrow);document.getElementById('btnSwapRoute').addEventListener('click',swapRoute);document.getElementById('btnClearRoute').addEventListener('click',clearRoute);
+// ========== V10: OBLÍBENÉ TRASY ==========
+function favUsageSort(a,b){return (b.usageCount||0)-(a.usageCount||0)||(a.route||'').localeCompare(b.route||'');}
+function getFilteredFavs(searchText){const q=normalizeForCompare(searchText||'');
+  if(!q)return state.favRoutes;
+  return state.favRoutes.filter(r=>{
+    const inName=normalizeForCompare(r.route).includes(q);
+    const inCat=normalizeForCompare(r.category).includes(q);
+    const inNote=normalizeForCompare(r.note||'').includes(q);
+    return inName||inCat||inNote;});}
+function renderFavList(){const container=document.getElementById('favList');if(!container)return;
+  const filtered=getFilteredFavs(state.favSearchText);
+  if(state.favRoutes.length===0){
+    container.innerHTML=`<div class="fav-empty"><div class="fav-empty-icon">⭐</div><div>Zatím žádné oblíbené trasy.<br>Klepněte na <b>+</b> pro přidání,<br>nebo uložte trasu přímo při zadávání jízdy.</div></div>`;return;}
+  if(filtered.length===0){
+    container.innerHTML=`<div class="fav-empty"><div class="fav-empty-icon">🔍</div><div>Nic nenalezeno pro „${escapeHtml(state.favSearchText)}".</div></div>`;return;}
+  let html='';
+  FAV_CATEGORIES.forEach(cat=>{
+    const inCat=filtered.filter(r=>r.category===cat).sort(favUsageSort);
+    if(inCat.length===0)return;
+    html+=`<div class="fav-cat-group"><div class="fav-cat-title">${escapeHtml(cat)}<span class="cat-count">${inCat.length}</span></div>`;
+    inCat.forEach(r=>{
+      const distStr=r.distance?`${fmtNumber(r.distance)} km`:'km ručně';
+      html+=`<div class="fav-item" data-fav-id="${r.id}">
+<div class="fav-item-main">
+<div class="fav-item-name">${escapeHtml(r.route)}</div>
+<div class="fav-item-meta"><span>${distStr}</span>${r.usageCount>0?`<span class="fav-usage">${r.usageCount}× použito</span>`:''}</div>
+${r.note?`<div class="fav-item-note">${escapeHtml(r.note)}</div>`:''}
+</div>
+<div style="color:var(--gray-300);font-size:18px;">›</div>
+</div>`;});
+    html+='</div>';});
+  container.innerHTML=html;
+  container.querySelectorAll('.fav-item').forEach(el=>{el.addEventListener('click',()=>openFavEditModal(el.dataset.favId));});}
+function renderFavCatPills(selectedCat){const container=document.getElementById('favCatPills');if(!container)return;
+  container.innerHTML=FAV_CATEGORIES.map(c=>`<button type="button" class="cat-pill${c===selectedCat?' active':''}" data-cat="${escapeAttr(c)}">${escapeHtml(c)}</button>`).join('');
+  container.querySelectorAll('.cat-pill').forEach(btn=>{btn.addEventListener('click',()=>{
+    state.selectedFavCat=btn.dataset.cat;
+    renderFavCatPills(state.selectedFavCat);});});}
+function openFavEditModal(favId=null){
+  const modal=document.getElementById('favEditModal');
+  document.getElementById('favId').value=favId||'';
+  document.getElementById('favEditTitle').textContent=favId?'Upravit oblíbenou trasu':'Nová oblíbená trasa';
+  document.getElementById('favDelete').style.display=favId?'':'none';
+  if(favId){const r=state.favRoutes.find(x=>x.id===favId);
+    if(r){document.getElementById('favRoute').value=r.route||'';
+      document.getElementById('favDistance').value=r.distance||'';
+      document.getElementById('favNote').value=r.note||'';
+      state.selectedFavCat=r.category||'Pravidelné';}}
+  else{document.getElementById('favRoute').value='';
+    document.getElementById('favDistance').value='';
+    document.getElementById('favNote').value='';
+    state.selectedFavCat='Pravidelné';}
+  renderFavCatPills(state.selectedFavCat);
+  modal.classList.add('show');}
+function closeFavEditModal(){document.getElementById('favEditModal').classList.remove('show');}
+function saveFavRoute(){
+  const id=document.getElementById('favId').value;
+  const route=document.getElementById('favRoute').value.trim();
+  if(!route){toast('Zadejte název trasy');return;}
+  const distRaw=document.getElementById('favDistance').value;
+  const distance=distRaw===''?null:Number(distRaw)||0;
+  const existing=id?state.favRoutes.find(x=>x.id===id):null;
+  const fav={id:id||uid(),createdAt:existing?existing.createdAt||Date.now():Date.now(),
+    route,category:state.selectedFavCat,distance,
+    note:document.getElementById('favNote').value.trim(),
+    usageCount:existing?existing.usageCount||0:0};
+  if(id){const idx=state.favRoutes.findIndex(x=>x.id===id);if(idx>=0)state.favRoutes[idx]=fav;toast('Oblíbená trasa upravena');}
+  else{state.favRoutes.push(fav);toast('Oblíbená trasa přidána');}
+  saveFavRoutes();closeFavEditModal();renderFavList();}
+function deleteFavRoute(){
+  const id=document.getElementById('favId').value;if(!id)return;
+  if(!confirm('Opravdu smazat tuto oblíbenou trasu?'))return;
+  state.favRoutes=state.favRoutes.filter(x=>x.id!==id);
+  saveFavRoutes();closeFavEditModal();renderFavList();toast('Oblíbená trasa smazána');}
+function favInsertArrow(){const input=document.getElementById('favRoute');const s=input.selectionStart,e=input.selectionEnd,txt=input.value;
+  const before=txt.substring(0,s),after=txt.substring(e);
+  const nb=before.length>0&&!before.endsWith(' '),na=!after.startsWith(' ');
+  const arrow=(nb?' ':'')+'→'+(na?' ':'');input.value=before+arrow+after;
+  const np=s+arrow.length;input.focus();input.setSelectionRange(np,np);}
+function favSwapRoute(){const input=document.getElementById('favRoute');
+  const parts=input.value.split('→').map(s=>s.trim()).filter(s=>s);
+  if(parts.length<2){toast('Trasa potřebuje alespoň 2 zastávky');return;}
+  input.value=parts.reverse().join(' → ');toast('Trasa otočena');}
+function favClearRoute(){const input=document.getElementById('favRoute');input.value='';input.focus();}
+function favAutoConvertArrow(e){const input=e.target;const val=input.value;
+  const patterns=['--','—','–'];let fi=-1,fl=0;
+  for(const p of patterns){const idx=val.indexOf(p);if(idx!==-1){fi=idx;fl=p.length;break;}}
+  if(fi===-1)return;
+  const before=val.substring(0,fi),after=val.substring(fi+fl);
+  const cb=before.replace(/\s+$/,''),ca=after.replace(/^\s+/,'');
+  const nv=cb+(cb?' ':'')+'→'+(ca?' ':'')+ca;
+  if(nv===val)return;input.value=nv;
+  const nc=cb.length+(cb?1:0)+1+(ca?1:0);input.setSelectionRange(nc,nc);}
+function openFavPicker(){
+  if(state.favRoutes.length===0){toast('Nemáte žádné oblíbené trasy. Přidejte je na záložce Trasy.');return;}
+  state.favPickerSearchText='';
+  document.getElementById('favPickerSearch').value='';
+  renderFavPickerList();
+  document.getElementById('favPickerModal').classList.add('show');}
+function closeFavPicker(){document.getElementById('favPickerModal').classList.remove('show');}
+function renderFavPickerList(){const container=document.getElementById('favPickerList');if(!container)return;
+  const filtered=getFilteredFavs(state.favPickerSearchText);
+  if(filtered.length===0){container.innerHTML=`<div class="fav-empty"><div class="fav-empty-icon">🔍</div><div>Nic nenalezeno.</div></div>`;return;}
+  let html='';
+  FAV_CATEGORIES.forEach(cat=>{
+    const inCat=filtered.filter(r=>r.category===cat).sort(favUsageSort);
+    if(inCat.length===0)return;
+    html+=`<div class="fav-cat-group"><div class="fav-cat-title">${escapeHtml(cat)}<span class="cat-count">${inCat.length}</span></div>`;
+    inCat.forEach(r=>{
+      const distStr=r.distance?`${fmtNumber(r.distance)} km`:'km zadáte ručně';
+      html+=`<div class="fav-picker-item" data-fav-id="${r.id}">
+<div class="fav-picker-name">${escapeHtml(r.route)}</div>
+<div class="fav-picker-meta">${distStr}${r.usageCount>0?` · ${r.usageCount}× použito`:''}</div>
+</div>`;});
+    html+='</div>';});
+  container.innerHTML=html;
+  container.querySelectorAll('.fav-picker-item').forEach(el=>{el.addEventListener('click',()=>applyFavToTrip(el.dataset.favId));});}
+function applyFavToTrip(favId){
+  const r=state.favRoutes.find(x=>x.id===favId);if(!r)return;
+  document.getElementById('tripRoute').value=r.route;
+  if(r.distance!==null&&r.distance!==undefined&&r.distance!==''){
+    document.getElementById('tripDistance').value=r.distance;}
+  r.usageCount=(r.usageCount||0)+1;
+  saveFavRoutes();
+  closeFavPicker();
+  state.lastCursorPos=document.getElementById('tripRoute').value.length;
+  validateLiveTrip();renderRouteSuggestions();
+  toast('Trasa vyplněna z oblíbených');}
+function saveTripRouteAsFav(){
+  const route=document.getElementById('tripRoute').value.trim();
+  if(!route){toast('Nejdřív zadejte trasu');return;}
+  const existing=state.favRoutes.find(r=>normalizeForCompare(r.route)===normalizeForCompare(route));
+  if(existing){toast('Tato trasa už je mezi oblíbenými');return;}
+  document.getElementById('favId').value='';
+  document.getElementById('favEditTitle').textContent='Nová oblíbená trasa';
+  document.getElementById('favDelete').style.display='none';
+  document.getElementById('favRoute').value=route;
+  const tripDist=document.getElementById('tripDistance').value;
+  document.getElementById('favDistance').value=tripDist||'';
+  document.getElementById('favNote').value='';
+  state.selectedFavCat='Pravidelné';
+  renderFavCatPills(state.selectedFavCat);
+  document.getElementById('favEditModal').classList.add('show');}
+
+function bindEvents(){document.getElementById('prevMonth').addEventListener('click',()=>{state.currentMonth--;if(state.currentMonth<0){state.currentMonth=11;state.currentYear--;}render();});document.getElementById('nextMonth').addEventListener('click',()=>{state.currentMonth++;if(state.currentMonth>11){state.currentMonth=0;state.currentYear++;}render();});document.getElementById('fabAdd').addEventListener('click',()=>{if(state.currentScreen==='trasy'){openFavEditModal();}else{openTripModal();}});document.querySelectorAll('.nav-item').forEach(n=>{n.addEventListener('click',()=>{const s=n.dataset.screen;if(s==='home')showScreen('home');else if(s==='vehicle'){loadVehicleForm();showScreen('vehicle');}else if(s==='trasy'){renderFavList();showScreen('trasy');}else{toast('Tato sekce bude dostupná v dalším kroku');}});});document.getElementById('tripModalClose').addEventListener('click',closeTripModal);document.getElementById('tripCancel').addEventListener('click',closeTripModal);document.getElementById('tripSave').addEventListener('click',saveTrip);document.getElementById('tripDelete').addEventListener('click',deleteTrip);document.querySelectorAll('.purpose-toggle button').forEach(b=>{b.addEventListener('click',()=>setPurpose(b.dataset.purpose));});document.getElementById('detailModalClose').addEventListener('click',closeDetailModal);document.getElementById('detailDone').addEventListener('click',closeDetailModal);document.getElementById('detailEdit').addEventListener('click',(e)=>{closeDetailModal();openTripModal(e.target.dataset.id);});document.getElementById('saveVehicle').addEventListener('click',saveVehicleForm);document.getElementById('btnResetTacho').addEventListener('click',resetAllTacho);document.querySelectorAll('.modal-overlay').forEach(o=>{o.addEventListener('click',(e)=>{if(e.target===o)o.classList.remove('show');});});document.getElementById('btnInsertArrow').addEventListener('click',insertArrow);document.getElementById('btnSwapRoute').addEventListener('click',swapRoute);document.getElementById('btnClearRoute').addEventListener('click',clearRoute);
 const routeInput=document.getElementById('tripRoute');
 routeInput.addEventListener('input',autoConvertArrow);
 routeInput.addEventListener('input',validateLiveTrip);
@@ -567,7 +786,21 @@ document.getElementById('tripDateStart').addEventListener('change',function(){
   validateLiveTrip();renderRouteSuggestions();});
 document.getElementById('tripDateEnd').addEventListener('change',function(){state.userEditedDateEnd=true;validateLiveTrip();});
 document.getElementById('tripDistance').addEventListener('input',validateLiveTrip);
-document.getElementById('tripTachoStart').addEventListener('input',onTachoManualEdit);}
+document.getElementById('tripTachoStart').addEventListener('input',onTachoManualEdit);
+document.getElementById('favSearch').addEventListener('input',function(){state.favSearchText=this.value;renderFavList();});
+document.getElementById('favEditClose').addEventListener('click',closeFavEditModal);
+document.getElementById('favCancel').addEventListener('click',closeFavEditModal);
+document.getElementById('favSave').addEventListener('click',saveFavRoute);
+document.getElementById('favDelete').addEventListener('click',deleteFavRoute);
+document.getElementById('favBtnArrow').addEventListener('click',favInsertArrow);
+document.getElementById('favBtnSwap').addEventListener('click',favSwapRoute);
+document.getElementById('favBtnClear').addEventListener('click',favClearRoute);
+document.getElementById('favRoute').addEventListener('input',favAutoConvertArrow);
+document.getElementById('btnPickFav').addEventListener('click',openFavPicker);
+document.getElementById('btnSaveFav').addEventListener('click',saveTripRouteAsFav);
+document.getElementById('favPickerClose').addEventListener('click',closeFavPicker);
+document.getElementById('favPickerCancel').addEventListener('click',closeFavPicker);
+document.getElementById('favPickerSearch').addEventListener('input',function(){state.favPickerSearchText=this.value;renderFavPickerList();});}
 loadData();
 bindEvents();render();
 if(!state.vehicle){loadVehicleForm();showScreen('vehicle');toast('Vítejte! Nastavte prosím vaše vozidlo.',3500);}
