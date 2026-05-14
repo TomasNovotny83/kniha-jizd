@@ -65,6 +65,10 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
 .nav-label{font-size:10px;font-weight:600;}
 .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:200;opacity:0;pointer-events:none;transition:opacity 0.2s;display:flex;align-items:flex-end;justify-content:center;}
 .modal-overlay.show{opacity:1;pointer-events:auto;}
+/* V11: top-aligned modal variant (for pickers, so iOS keyboard doesn't cover it) */
+.modal-overlay.top-align{align-items:flex-start;}
+.modal-overlay.top-align .modal{border-radius:0 0 20px 20px;transform:translateY(-100%);max-height:85vh;margin-top:env(safe-area-inset-top);}
+.modal-overlay.top-align.show .modal{transform:translateY(0);}
 .modal{background:white;width:100%;max-width:600px;max-height:90vh;border-radius:20px 20px 0 0;overflow:hidden;transform:translateY(100%);transition:transform 0.25s cubic-bezier(0.32,0.72,0,1);display:flex;flex-direction:column;}
 .modal-overlay.show .modal{transform:translateY(0);}
 .modal-header{padding:16px 20px;border-bottom:1px solid var(--gray-200);display:flex;justify-content:space-between;align-items:center;flex-shrink:0;}
@@ -157,7 +161,7 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
 <body>
 <div class="header">
 <div class="header-content">
-<div class="header-title">🚗 Kniha jízd<span class="version-tag">v10</span></div>
+<div class="header-title">🚗 Kniha jízd<span class="version-tag">v11</span></div>
 <div class="header-subtitle" id="vehicleSubtitle">Nastavte vozidlo →</div>
 </div>
 <div class="month-selector">
@@ -312,7 +316,7 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
 </div>
 </div>
 </div>
-<div class="modal-overlay" id="favPickerModal">
+<div class="modal-overlay top-align" id="favPickerModal">
 <div class="modal">
 <div class="modal-header"><div class="modal-title">⭐ Vybrat z oblíbených</div><button class="modal-close" id="favPickerClose">✕</button></div>
 <div class="modal-body">
@@ -358,14 +362,16 @@ function normalizeForCompare(s){return (s||'').toLowerCase().normalize('NFD').re
 function routesNavazuji(prevRoute,currRoute){const prevLast=normalizeForCompare(getRouteLast(prevRoute));const currFirst=normalizeForCompare(getRouteFirst(currRoute));if(!prevLast||!currFirst)return true;
 return prevLast===currFirst;}
 function recalcTachoChain(){if(state.trips.length===0)return;
+// V11: AUTO RECALCULATE ALWAYS. tachoManual is no longer a fixed anchor.
+// Every trip's tachoStart is derived from the chain: first trip = vehicle start,
+// every other trip = previous trip's tachoEnd. This guarantees no gaps/overlaps.
+// The manual-entered value only serves (in saveTrip) to position the trip within its day.
 const sorted=sortedByDate(state.trips);
 let running=state.vehicle&&state.vehicle.pocTacho?Number(state.vehicle.pocTacho):0;
 if(!running&&sorted.length>0){running=Number(sorted[0].tachoStart)||0;}
 for(let i=0;i<sorted.length;i++){const t=sorted[i];
   if(i===0){
     if(state.vehicle&&state.vehicle.pocTacho){t.tachoStart=Number(state.vehicle.pocTacho);}
-    running=Number(t.tachoStart)||running;
-  }else if(t.tachoManual){
     running=Number(t.tachoStart)||running;
   }else{
     t.tachoStart=running;
@@ -513,7 +519,9 @@ document.getElementById('routeSuggestions').innerHTML='';
 if(tripId){const t=state.trips.find(x=>x.id===tripId);if(t){document.getElementById('tripDateStart').value=t.dateStart||'';document.getElementById('tripDateEnd').value=t.dateEnd||t.dateStart||'';document.getElementById('tripRoute').value=t.route||'';document.getElementById('tripTachoStart').value=t.tachoStart||'';document.getElementById('tripDistance').value=t.distance||'';document.getElementById('tripNote').value=t.note||'';setPurpose(t.purpose||'Služební');state.userOverrodeTacho=!!t.tachoManual;state.initialTachoValue=Number(t.tachoStart)||0;state.userEditedDateEnd=t.dateEnd&&t.dateEnd!==t.dateStart;updateTachoLabel();}}
 else{const today=todayISO();document.getElementById('tripDateStart').value=today;document.getElementById('tripDateEnd').value=today;document.getElementById('tripRoute').value='';document.getElementById('tripNote').value='';document.getElementById('tripDistance').value='';setPurpose('Služební');autoFillTachoStart();updateTachoLabel();}
 modal.classList.add('show');setTimeout(()=>{validateLiveTrip();renderRouteSuggestions();},100);}
-function updateTachoLabel(){const lbl=document.getElementById('tachoAutoLabel');if(state.userOverrodeTacho){lbl.textContent='(ručně)';lbl.style.color='var(--orange)';}else{lbl.textContent='(auto)';lbl.style.color='var(--gray-500)';}}
+function updateTachoLabel(){const lbl=document.getElementById('tachoAutoLabel');
+// V11: tacho is always auto-recalculated. Manual edit only affects WHERE the trip lands within its day.
+if(state.userOverrodeTacho){lbl.textContent='(zařadí dle této hodnoty)';lbl.style.color='var(--orange)';}else{lbl.textContent='(auto)';lbl.style.color='var(--gray-500)';}}
 function setPurpose(p){state.selectedPurpose=p;document.querySelectorAll('.purpose-toggle button').forEach(b=>{b.classList.toggle('active',b.dataset.purpose===p);});}
 function closeTripModal(){document.getElementById('tripModal').classList.remove('show');}
 function clearHints(){document.getElementById('dateHint').innerHTML='';document.getElementById('tachoHint').innerHTML='';document.getElementById('routeHint').innerHTML='';document.getElementById('distanceHint').innerHTML='';document.getElementById('tripTachoStart').classList.remove('has-error','has-warning');document.getElementById('tripDateEnd').classList.remove('has-error','has-warning');document.getElementById('tripRoute').classList.remove('has-warning');document.getElementById('tripDistance').classList.remove('has-error','has-warning');}
@@ -599,7 +607,7 @@ const issues=validateTrip(t,state.trips);
 let issuesHtml='';
 issues.errors.forEach(e=>{issuesHtml+=`<div class="field-hint error" style="margin-bottom:8px;"><span>❌</span><div>${e.msg}</div></div>`;});
 issues.warnings.forEach(w=>{issuesHtml+=`<div class="field-hint warning" style="margin-bottom:8px;"><span>⚠️</span><div>${w.msg}</div></div>`;});
-document.getElementById('detailBody').innerHTML=issuesHtml+`<div class="detail-row"><span class="detail-label">Datum</span><span class="detail-value">${d.getDate()}. ${MONTHS_CS_SHORT[d.getMonth()]}. ${d.getFullYear()}</span></div><div class="detail-row"><span class="detail-label">Trasa</span><span class="detail-value" style="max-width:60%;">${escapeHtml(t.route)}</span></div><div class="detail-row"><span class="detail-label">Účel</span><span class="detail-value"><span class="badge ${t.purpose==='Soukromá'?'badge-soukroma':'badge-sluzebni'}">${t.purpose}</span></span></div><div class="detail-row"><span class="detail-label">Tacho start</span><span class="detail-value">${fmtNumber(t.tachoStart)} km${t.tachoManual?' <small style="color:var(--orange);">(ručně)</small>':''}</span></div><div class="detail-row"><span class="detail-label">Tacho konec</span><span class="detail-value">${fmtNumber(te)} km</span></div><div class="detail-row"><span class="detail-label">Vzdálenost</span><span class="detail-value">${fmtNumber(t.distance)} km</span></div>${nahrada>0?`<div class="detail-row"><span class="detail-label">Náhrada</span><span class="detail-value">${fmtCurrency(nahrada)}</span></div>`:''}${t.note?`<div class="detail-row" style="flex-direction:column;align-items:flex-start;"><span class="detail-label" style="margin-bottom:6px;">Poznámka</span><span class="detail-value" style="text-align:left;font-weight:400;color:var(--gray-700);">${escapeHtml(t.note)}</span></div>`:''}`;
+document.getElementById('detailBody').innerHTML=issuesHtml+`<div class="detail-row"><span class="detail-label">Datum</span><span class="detail-value">${d.getDate()}. ${MONTHS_CS_SHORT[d.getMonth()]}. ${d.getFullYear()}</span></div><div class="detail-row"><span class="detail-label">Trasa</span><span class="detail-value" style="max-width:60%;">${escapeHtml(t.route)}</span></div><div class="detail-row"><span class="detail-label">Účel</span><span class="detail-value"><span class="badge ${t.purpose==='Soukromá'?'badge-soukroma':'badge-sluzebni'}">${t.purpose}</span></span></div><div class="detail-row"><span class="detail-label">Tacho start</span><span class="detail-value">${fmtNumber(t.tachoStart)} km</span></div><div class="detail-row"><span class="detail-label">Tacho konec</span><span class="detail-value">${fmtNumber(te)} km</span></div><div class="detail-row"><span class="detail-label">Vzdálenost</span><span class="detail-value">${fmtNumber(t.distance)} km</span></div>${nahrada>0?`<div class="detail-row"><span class="detail-label">Náhrada</span><span class="detail-value">${fmtCurrency(nahrada)}</span></div>`:''}${t.note?`<div class="detail-row" style="flex-direction:column;align-items:flex-start;"><span class="detail-label" style="margin-bottom:6px;">Poznámka</span><span class="detail-value" style="text-align:left;font-weight:400;color:var(--gray-700);">${escapeHtml(t.note)}</span></div>`:''}`;
 document.getElementById('detailEdit').dataset.id=id;document.getElementById('detailModal').classList.add('show');}
 function closeDetailModal(){document.getElementById('detailModal').classList.remove('show');}
 function loadVehicleForm(){const v=state.vehicle||{};document.getElementById('vehicleZnacka').value=v.znacka||'';document.getElementById('vehicleModel').value=v.model||'';document.getElementById('vehicleSPZ').value=v.spz||'';document.getElementById('vehicleVIN').value=v.vin||'';document.getElementById('vehiclePalivo').value=v.palivo||'Nafta';document.getElementById('vehiclePocTacho').value=v.pocTacho||'';document.getElementById('vehicleSazba').value=v.sazba||'5.60';document.getElementById('vehicleRidic').value=v.ridic||'';}
