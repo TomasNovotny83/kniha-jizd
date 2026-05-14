@@ -132,7 +132,7 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
 <body>
 <div class="header">
 <div class="header-content">
-<div class="header-title">🚗 Kniha jízd<span class="version-tag">v8.1</span></div>
+<div class="header-title">🚗 Kniha jízd<span class="version-tag">v9</span></div>
 <div class="header-subtitle" id="vehicleSubtitle">Nastavte vozidlo →</div>
 </div>
 <div class="month-selector">
@@ -260,7 +260,10 @@ function todayISO(){return new Date().toISOString().split('T')[0];}
 function parseISO(s){return new Date(s+'T00:00:00');}
 function escapeHtml(s){const div=document.createElement('div');div.textContent=s||'';return div.innerHTML;}
 function escapeAttr(s){return (s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/'/g,'&#39;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
-function sortedByDate(trips){return [...trips].sort((a,b)=>{const c=(a.dateStart||'').localeCompare(b.dateStart||'');if(c!==0)return c;const o=(a.sortOrder||0)-(b.sortOrder||0);if(o!==0)return o;return (a.createdAt||0)-(b.createdAt||0);});}
+function sortedByDate(trips){return [...trips].sort((a,b)=>{const c=(a.dateStart||'').localeCompare(b.dateStart||'');if(c!==0)return c;
+// V9: within same day, sort by tachoStart (chain order), then sortOrder, then createdAt
+const ta=Number(a.tachoStart||0),tb=Number(b.tachoStart||0);if(ta!==tb)return ta-tb;
+const o=(a.sortOrder||0)-(b.sortOrder||0);if(o!==0)return o;return (a.createdAt||0)-(b.createdAt||0);});}
 function tachoEnd(trip){return Number(trip.tachoStart||0)+Number(trip.distance||0);}
 function getRouteParts(route){if(!route)return [];return route.split('→').map(s=>s.trim()).filter(s=>s);}
 function getRouteFirst(route){const parts=getRouteParts(route);return parts[0]||'';}
@@ -268,7 +271,10 @@ function getRouteLast(route){const parts=getRouteParts(route);return parts[parts
 function normalizeForCompare(s){return (s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim();}
 function routesNavazuji(prevRoute,currRoute){const prevLast=normalizeForCompare(getRouteLast(prevRoute));const currFirst=normalizeForCompare(getRouteFirst(currRoute));if(!prevLast||!currFirst)return true;
 return prevLast===currFirst;}
-function recalcTachoChain(){if(state.trips.length===0)return;const sorted=sortedByDate(state.trips);
+function recalcTachoChain(){if(state.trips.length===0)return;
+// V9: sort uses current tachoStart values as ordering hints (snapshot taken by sortedByDate).
+// Manual trips & first trip act as fixed anchors; auto trips flow from previous trip's end.
+const sorted=sortedByDate(state.trips);
 let running=state.vehicle&&state.vehicle.pocTacho?Number(state.vehicle.pocTacho):0;
 if(!running&&sorted.length>0){running=Number(sorted[0].tachoStart)||0;}
 for(let i=0;i<sorted.length;i++){const t=sorted[i];
@@ -336,6 +342,7 @@ return `<div class="${cls}" data-id="${t.id}">
 </div>
 ${reorderHtml}
 </div>`;}).join('');
+// Bind events via delegation
 list.querySelectorAll('.trip-content').forEach(el=>{el.addEventListener('click',()=>showDetail(el.dataset.detailId));});
 list.querySelectorAll('.reorder-btn').forEach(btn=>{btn.addEventListener('click',(e)=>{e.stopPropagation();if(btn.disabled)return;moveTripVisually(btn.dataset.tripId,btn.dataset.moveDir);});});
 }
@@ -371,8 +378,11 @@ const id=document.getElementById('tripId').value;
 if(!dateStart){container.innerHTML='';return;}
 const others=state.trips.filter(t=>t.id!==id&&t.route);
 const existingThis=id?state.trips.find(t=>t.id===id):null;
-const myOrder=existingThis?existingThis.sortOrder:99999;
-const tempTrip={id:'_temp',dateStart,sortOrder:myOrder};
+const myOrder=existingThis?existingThis.sortOrder:-1;
+// V9: include tachoStart so sortedByDate positions temp trip correctly within the day.
+// sortOrder=-1 for new trips ensures tie goes BEFORE existing same-tacho trip.
+const tachoStartNow=Number(document.getElementById('tripTachoStart').value)||0;
+const tempTrip={id:'_temp',dateStart,sortOrder:myOrder,tachoStart:tachoStartNow};
 const sorted=sortedByDate([...others,tempTrip]);
 const myIdx=sorted.findIndex(t=>t.id==='_temp');
 const prev=myIdx>0?sorted[myIdx-1]:null;
@@ -389,13 +399,16 @@ if(next&&next.route){const nextFirst=getRouteFirst(next.route);
   if(nextFirst&&normalizeForCompare(nextFirst)!==normalizeForCompare(currentLast)){
     buttons.push({label:`📍 Do: ${nextFirst}`,value:nextFirst,type:'end'});}}
 if(buttons.length===0){container.innerHTML='';return;}
+// V8.1 FIX: use data attributes and event delegation instead of inline onclick
 container.innerHTML=`<div class="route-suggestions">
 <span class="route-suggestions-label">💡 Návrhy podle sousedních jízd:</span>
 <div class="route-suggestion-btns">
 ${buttons.map((b,i)=>`<button type="button" class="route-suggestion-btn" data-suggest-type="${b.type}" data-suggest-value="${escapeAttr(b.value)}">${escapeHtml(b.label)}</button>`).join('')}
 </div>
 </div>`;
+// Bind click handlers via JS instead of inline onclick (avoids HTML escaping issues with quotes/commas)
 container.querySelectorAll('.route-suggestion-btn').forEach(btn=>{btn.addEventListener('click',(e)=>{e.preventDefault();applySuggestion(btn.dataset.suggestType,btn.dataset.suggestValue);});});}
+
 function applySuggestion(type,value){const input=document.getElementById('tripRoute');const current=input.value;
 if(!current.trim()){
   if(type==='start'){input.value=value+' → ';input.focus();input.setSelectionRange(input.value.length,input.value.length);state.lastCursorPos=input.value.length;}
@@ -435,7 +448,8 @@ if(!dateStart)return;
 if(dateEnd&&dateEnd<dateStart){document.getElementById('tripDateEnd').classList.add('has-error');document.getElementById('dateHint').innerHTML=`<div class="field-hint error"><span>❌</span><div>Datum konce nemůže být dříve než datum začátku.</div></div>`;}
 const otherTrips=state.trips.filter(t=>t.id!==id);
 const existingThis=id?state.trips.find(t=>t.id===id):null;
-const myOrder=existingThis?existingThis.sortOrder:99999;
+// V9: sortOrder=-1 for new trips so a tachoStart tie places the new trip BEFORE existing
+const myOrder=existingThis?existingThis.sortOrder:-1;
 const tempTrip={id:id||'_new',dateStart,dateEnd:dateEnd||dateStart,tachoStart,distance,route,sortOrder:myOrder};
 const sorted=sortedByDate([...otherTrips,tempTrip]);
 const myIdx=sorted.findIndex(t=>t.id===tempTrip.id);
@@ -474,15 +488,32 @@ if(next){const nextStart=Number(next.tachoStart||0);
 const days=dateEnd&&dateStart?Math.max(1,Math.round((parseISO(dateEnd)-parseISO(dateStart))/86400000)+1):1;
 const kmDay=distance/days;
 if(kmDay>1000){const w=`<div class="field-hint warning"><span>⚠️</span><div>Vzdálenost <b>${fmtNumber(kmDay)} km/den</b> je neobvykle vysoká.</div></div>`;hintEl.innerHTML+=w;}
+// Bind fix buttons inside hints
 document.querySelectorAll('[data-fix-tacho]').forEach(b=>{b.onclick=(e)=>{e.preventDefault();applyTachoFix(Number(b.dataset.fixTacho));};});
 }
 function applyTachoFix(val){document.getElementById('tripTachoStart').value=val;state.userOverrodeTacho=false;state.initialTachoValue=val;updateTachoLabel();validateLiveTrip();}
 function getNextSortOrder(){let max=0;state.trips.forEach(t=>{if(typeof t.sortOrder==='number'&&t.sortOrder>max)max=t.sortOrder;});return max+1;}
+// V9: for a NEW trip, pick a sortOrder so that if its tachoStart ties with an existing
+// same-day trip, the new trip sorts BEFORE the existing one. Otherwise tachoStart ordering wins.
+function computeSortOrderForNew(dateStart,tachoStart){
+  const sameDay=state.trips.filter(t=>t.dateStart===dateStart);
+  if(sameDay.length===0)return getNextSortOrder();
+  // existing same-day trips with tachoStart >= new trip's tachoStart: new trip must come before them
+  const tiesOrAfter=sameDay.filter(t=>Number(t.tachoStart||0)>=Number(tachoStart||0));
+  if(tiesOrAfter.length>0){
+    let minOrder=Infinity;
+    tiesOrAfter.forEach(t=>{if(typeof t.sortOrder==='number'&&t.sortOrder<minOrder)minOrder=t.sortOrder;});
+    if(minOrder!==Infinity)return minOrder-1;
+  }
+  return getNextSortOrder();
+}
 function saveTrip(){const id=document.getElementById('tripId').value;const dateStart=document.getElementById('tripDateStart').value;const route=document.getElementById('tripRoute').value.trim();
 if(!dateStart){toast('Zadejte datum začátku');return;}
 if(!route){toast('Zadejte trasu');return;}
 const existing=id?state.trips.find(x=>x.id===id):null;
-const trip={id:id||uid(),createdAt:existing?existing.createdAt||Date.now():Date.now(),sortOrder:existing?existing.sortOrder:getNextSortOrder(),dateStart,dateEnd:document.getElementById('tripDateEnd').value||dateStart,route,purpose:state.selectedPurpose,tachoStart:Number(document.getElementById('tripTachoStart').value)||0,distance:Number(document.getElementById('tripDistance').value)||0,note:document.getElementById('tripNote').value.trim(),tachoManual:state.userOverrodeTacho};
+const tachoStartVal=Number(document.getElementById('tripTachoStart').value)||0;
+const sortOrderVal=existing?existing.sortOrder:computeSortOrderForNew(dateStart,tachoStartVal);
+const trip={id:id||uid(),createdAt:existing?existing.createdAt||Date.now():Date.now(),sortOrder:sortOrderVal,dateStart,dateEnd:document.getElementById('tripDateEnd').value||dateStart,route,purpose:state.selectedPurpose,tachoStart:tachoStartVal,distance:Number(document.getElementById('tripDistance').value)||0,note:document.getElementById('tripNote').value.trim(),tachoManual:state.userOverrodeTacho};
 if(id){const idx=state.trips.findIndex(x=>x.id===id);if(idx>=0)state.trips[idx]=trip;toast('Jízda upravena');}
 else{state.trips.push(trip);toast('Jízda přidána');}
 recalcTachoChain();
