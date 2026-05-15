@@ -1399,6 +1399,15 @@ window.saveTrip=function(){var id=document.getElementById("tripId").value;var da
 document.getElementById("tripSave").removeEventListener("click",saveTrip);
 document.getElementById("tripSave").addEventListener("click",window.saveTrip);
 })();
+loadData();
+bindEvents();render();
+if(!state.vehicle){loadVehicleForm();showScreen('vehicle');toast('Vítejte!...
+;(function(){
+... (celý vložený patch) ...
+})();
+</script>
+</body>
+</html>
 </script>
 </body>
 </html>
