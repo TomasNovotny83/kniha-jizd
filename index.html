@@ -185,7 +185,7 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
 <body>
 <div class="header">
 <div class="header-content">
-<div class="header-title">🚗 Kniha jízd<span class="version-tag">v14</span></div>
+<div class="header-title">🚗 Kniha jízd<span class="version-tag">v14d</span></div>
 <div class="header-subtitle" id="vehicleSubtitle">Nastavte vozidlo →</div>
 </div>
 <div class="month-selector">
@@ -392,6 +392,13 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
 <div class="toast" id="toast"></div>
 <script>
 'use strict';
+// V14d: globální chytač chyb pro diagnostiku
+window.addEventListener('error', function(e){
+  document.body.innerHTML='<div style="padding:20px;font-family:monospace;font-size:14px;line-height:1.5;background:#FFCCCC;color:#000;white-space:pre-wrap;word-break:break-word;">CHYBA NA RIADKU '+e.lineno+', SLOUPEC '+e.colno+':\n\n'+e.message+'\n\nSOUBOR: '+(e.filename||'?')+'\n\nSTACK:\n'+(e.error&&e.error.stack||'(žádný stack)')+'</div>';
+});
+window.addEventListener('unhandledrejection', function(e){
+  document.body.innerHTML='<div style="padding:20px;font-family:monospace;font-size:14px;background:#FFCCCC;">PROMISE CHYBA: '+e.reason+'</div>';
+});
 const state={trips:[],vehicle:null,favRoutes:[],currentMonth:new Date().getMonth(),currentYear:new Date().getFullYear(),currentScreen:'home',selectedPurpose:'Služební',userOverrodeTacho:false,initialTachoValue:null,userEditedDateEnd:false,lastCursorPos:null,selectedFavCat:'Pravidelné',favSearchText:'',favPickerSearchText:'',selectedFavPurpose:'Služební',genSelectedRouteIds:[],genPreview:null};
 const FAV_CATEGORIES=['Pravidelné','Klienti','Servis','Sklad','Soukromé','Ostatní'];
 const MONTHS_CS=['Leden','Únor','Březen','Duben','Květen','Červen','Červenec','Srpen','Září','Říjen','Listopad','Prosinec'];
