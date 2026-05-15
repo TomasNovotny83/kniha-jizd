@@ -159,6 +159,23 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
 .btn-fav-save:active{background:var(--green);color:white;transform:scale(0.95);}
 .btn-fav-pick{background:#FEF3C7;color:var(--warn);border:1.5px solid transparent;border-radius:10px;padding:8px 14px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:4px;}
 .btn-fav-pick:active{background:var(--warn);color:white;transform:scale(0.95);}
+.gen-step-label{font-size:13px;font-weight:700;color:var(--primary);text-transform:uppercase;letter-spacing:0.4px;margin-bottom:6px;}
+.gen-route-item{display:flex;align-items:center;gap:12px;padding:12px 14px;border:1.5px solid var(--gray-200);border-radius:12px;margin-bottom:8px;cursor:pointer;background:white;}
+.gen-route-item.selected{border-color:var(--primary);background:var(--primary-bg);}
+.gen-route-item.disabled{opacity:0.45;cursor:not-allowed;}
+.gen-route-check{width:24px;height:24px;border-radius:7px;border:2px solid var(--gray-300);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:14px;color:white;font-weight:700;}
+.gen-route-item.selected .gen-route-check{background:var(--primary);border-color:var(--primary);}
+.gen-route-info{flex:1;min-width:0;}
+.gen-route-name{font-size:14px;font-weight:600;color:var(--gray-900);line-height:1.3;}
+.gen-route-meta{font-size:12px;color:var(--gray-500);margin-top:2px;}
+.gen-chain-ok{background:var(--green-bg);color:var(--green);border-radius:10px;padding:10px 12px;font-size:13px;display:flex;gap:8px;align-items:start;line-height:1.4;}
+.gen-chain-bad{background:var(--warn-bg);color:var(--warn);border-radius:10px;padding:10px 12px;font-size:13px;display:flex;gap:8px;align-items:start;line-height:1.4;}
+.gen-preview-trip{display:flex;gap:10px;padding:10px 12px;border-bottom:1px solid var(--gray-100);font-size:13px;}
+.gen-preview-date{font-weight:700;color:var(--primary);min-width:48px;flex-shrink:0;}
+.gen-preview-route{flex:1;min-width:0;color:var(--gray-900);}
+.gen-preview-km{color:var(--gray-500);flex-shrink:0;}
+.gen-preview-header{font-size:13px;font-weight:700;color:var(--gray-700);padding:10px 0 6px;text-transform:uppercase;letter-spacing:0.4px;}
+.gen-preview-summary{background:var(--primary-bg);border-radius:10px;padding:12px 14px;font-size:13px;color:var(--primary);margin-bottom:10px;line-height:1.5;}
 .admin-section{background:white;padding:20px;max-width:600px;margin:20px auto 0;border-top:1px solid var(--gray-200);}
 .admin-section h3{font-size:13px;color:var(--gray-500);margin-bottom:12px;text-transform:uppercase;letter-spacing:0.5px;}
 .admin-btn{width:100%;margin-top:8px;}
@@ -167,7 +184,7 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
 <body>
 <div class="header">
 <div class="header-content">
-<div class="header-title">🚗 Kniha jízd<span class="version-tag">v12</span></div>
+<div class="header-title">🚗 Kniha jízd<span class="version-tag">v13</span></div>
 <div class="header-subtitle" id="vehicleSubtitle">Nastavte vozidlo →</div>
 </div>
 <div class="month-selector">
@@ -183,9 +200,35 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
 <div class="stat"><div class="stat-value" id="statLitry">0,0</div><div class="stat-label">l natankováno</div></div>
 </div>
 <div id="problemBanner"></div>
+<div style="padding:0 20px 4px;">
+<button class="btn btn-secondary" id="btnOpenGenerator" style="width:100%;background:var(--primary-bg);color:var(--primary);font-weight:700;">🪄 Automatické vyplnění knihy jízd</button>
+</div>
 <div class="section">
 <div class="section-header"><span>Jízdy tento měsíc</span></div>
 <div class="trip-list" id="tripList"></div>
+</div>
+</div>
+<div id="screen-generator" style="display:none;">
+<div style="padding:16px 20px 0;"><button class="btn btn-secondary" id="btnGeneratorBack" style="flex:none;padding:8px 16px;font-size:14px;">‹ Zpět na jízdy</button></div>
+<div class="setup" style="padding:12px 20px 12px;"><h2 style="font-size:22px;">🪄 Automatické vyplnění</h2><p style="margin-bottom:0;">Vygeneruje jízdy z vybraných oblíbených tras</p></div>
+<div style="background:white;padding:16px 20px 24px;max-width:600px;margin:0 auto;min-height:60vh;">
+<div class="gen-step-label">1. Vyberte oblíbené trasy</div>
+<div class="tip-text" style="margin-top:0;margin-bottom:8px;">Použít lze jen trasy s vyplněnou vzdáleností. Zaškrtnuté trasy musí na sebe navazovat (konec jedné = začátek další).</div>
+<div id="genRouteList"></div>
+<div class="gen-step-label" style="margin-top:22px;">2. Cílové datum</div>
+<input type="date" class="form-input" id="genTargetDate">
+<div class="gen-step-label" style="margin-top:18px;">3. Cílový stav tachometru (km)</div>
+<input type="number" class="form-input" id="genTargetTacho" placeholder="Kolik má tachometr ukazovat k cílovému datu">
+<div id="genTachoInfo" class="tip-text" style="margin-top:6px;"></div>
+<div class="gen-step-label" style="margin-top:18px;">4. Náhodná odchylka vzdálenosti</div>
+<div style="display:flex;align-items:center;gap:12px;">
+<input type="range" id="genVariance" min="0" max="10" value="2" style="flex:1;">
+<span id="genVarianceLabel" style="font-weight:700;color:var(--primary);min-width:42px;text-align:right;">2 %</span>
+</div>
+<div class="tip-text" style="margin-top:4px;">Km u tras budou kolísat o ± tuto hodnotu, aby kniha vypadala realisticky.</div>
+<div id="genChainCheck" style="margin-top:18px;"></div>
+<button class="btn btn-primary" id="btnGenerate" style="width:100%;margin-top:18px;">Vygenerovat náhled</button>
+<div id="genPreviewArea" style="margin-top:20px;"></div>
 </div>
 </div>
 <div id="screen-vehicle" style="display:none;">
@@ -310,9 +353,19 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
 <div class="cat-pills" id="favCatPills"></div>
 </div>
 <div class="form-row">
+<label class="form-label">Účel</label>
+<div class="purpose-toggle">
+<button type="button" id="favPurposeSluzebni" data-fav-purpose="Služební" class="active">Služební</button>
+<button type="button" id="favPurposeSoukroma" data-fav-purpose="Soukromá">Soukromá</button>
+</div>
+</div>
+<div class="form-row">
 <label class="form-label">Vzdálenost (km) <span class="tacho-locked-icon">nepovinné</span></label>
-<input type="number" class="form-input" id="favDistance" placeholder="Nechte prázdné = zadám ručně">
-<div class="tip-text">Když necháte prázdné, vzdálenost zadáte při každém použití zvlášť.</div>
+<div class="form-row-double" style="margin-bottom:0;">
+<div><input type="number" class="form-input" id="favDistMin" placeholder="od"></div>
+<div><input type="number" class="form-input" id="favDistMax" placeholder="do"></div>
+</div>
+<div class="tip-text">Pevná vzdálenost: vyplňte jen „od" (nebo obě stejně). Rozsah (např. Mladá Boleslav 8–40): vyplňte obě. Prázdné = zadáte ručně, nelze použít v generátoru.</div>
 </div>
 <div class="form-row"><label class="form-label">Poznámka</label><textarea class="form-textarea" id="favNote" placeholder="Volný text..."></textarea></div>
 </div>
@@ -338,7 +391,7 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
 <div class="toast" id="toast"></div>
 <script>
 'use strict';
-const state={trips:[],vehicle:null,favRoutes:[],currentMonth:new Date().getMonth(),currentYear:new Date().getFullYear(),currentScreen:'home',selectedPurpose:'Služební',userOverrodeTacho:false,initialTachoValue:null,userEditedDateEnd:false,lastCursorPos:null,selectedFavCat:'Pravidelné',favSearchText:'',favPickerSearchText:''};
+const state={trips:[],vehicle:null,favRoutes:[],currentMonth:new Date().getMonth(),currentYear:new Date().getFullYear(),currentScreen:'home',selectedPurpose:'Služební',userOverrodeTacho:false,initialTachoValue:null,userEditedDateEnd:false,lastCursorPos:null,selectedFavCat:'Pravidelné',favSearchText:'',favPickerSearchText:'',selectedFavPurpose:'Služební',genSelectedRouteIds:[],genPreview:null};
 const FAV_CATEGORIES=['Pravidelné','Klienti','Servis','Sklad','Soukromé','Ostatní'];
 const MONTHS_CS=['Leden','Únor','Březen','Duben','Květen','Červen','Červenec','Srpen','Září','Říjen','Listopad','Prosinec'];
 const MONTHS_CS_SHORT=['Led','Úno','Bře','Dub','Kvě','Čer','Črc','Srp','Zář','Říj','Lis','Pro'];
@@ -346,8 +399,16 @@ function loadData(){try{const t=localStorage.getItem('kj_trips');state.trips=t?J
 let maxOrder=0;state.trips.forEach(t=>{if(typeof t.sortOrder==='number')maxOrder=Math.max(maxOrder,t.sortOrder);});
 state.trips.forEach(t=>{if(typeof t.sortOrder!=='number'){maxOrder++;t.sortOrder=maxOrder;}});
 const fr=localStorage.getItem('kj_routes');state.favRoutes=fr?JSON.parse(fr):[];
-// migrate: ensure category valid
-state.favRoutes.forEach(r=>{if(!FAV_CATEGORIES.includes(r.category))r.category='Ostatní';if(typeof r.usageCount!=='number')r.usageCount=0;});}catch(e){console.error(e);}}
+// migrate: ensure category valid, usageCount numeric
+state.favRoutes.forEach(r=>{if(!FAV_CATEGORIES.includes(r.category))r.category='Ostatní';if(typeof r.usageCount!=='number')r.usageCount=0;
+  // V13: migrate single distance -> distMin/distMax range; add purpose
+  if(r.distMin===undefined&&r.distMax===undefined){
+    if(r.distance!==null&&r.distance!==undefined&&r.distance!==''){r.distMin=Number(r.distance);r.distMax=Number(r.distance);}
+    else{r.distMin=null;r.distMax=null;}
+    delete r.distance;
+  }
+  if(r.purpose!=='Služební'&&r.purpose!=='Soukromá')r.purpose='Služební';
+});}catch(e){console.error(e);}}
 function saveTrips(){localStorage.setItem('kj_trips',JSON.stringify(state.trips));}
 function saveVehicle(){localStorage.setItem('kj_vehicle',JSON.stringify(state.vehicle));}
 function saveFavRoutes(){localStorage.setItem('kj_routes',JSON.stringify(state.favRoutes));}
@@ -360,6 +421,7 @@ function parseISO(s){return new Date(s+'T00:00:00');}
 function escapeHtml(s){const div=document.createElement('div');div.textContent=s||'';return div.innerHTML;}
 function escapeAttr(s){return (s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/'/g,'&#39;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 function sortedByDate(trips){return [...trips].sort((a,b)=>{const c=(a.dateStart||'').localeCompare(b.dateStart||'');if(c!==0)return c;
+// V9: within same day, sort by tachoStart (chain order), then sortOrder, then createdAt
 const ta=Number(a.tachoStart||0),tb=Number(b.tachoStart||0);if(ta!==tb)return ta-tb;
 const o=(a.sortOrder||0)-(b.sortOrder||0);if(o!==0)return o;return (a.createdAt||0)-(b.createdAt||0);});}
 function tachoEnd(trip){return Number(trip.tachoStart||0)+Number(trip.distance||0);}
@@ -440,6 +502,7 @@ return `<div class="${cls}" data-id="${t.id}">
 </div>
 ${reorderHtml}
 </div>`;}).join('');
+// Bind events via delegation
 list.querySelectorAll('.trip-content').forEach(el=>{el.addEventListener('click',()=>showDetail(el.dataset.detailId));});
 list.querySelectorAll('.reorder-btn').forEach(btn=>{btn.addEventListener('click',(e)=>{e.stopPropagation();if(btn.disabled)return;moveTripVisually(btn.dataset.tripId,btn.dataset.moveDir);});});
 }
@@ -694,6 +757,34 @@ function onTachoManualEdit(){const currentVal=Number(document.getElementById('tr
 if(state.initialTachoValue!==null&&currentVal!==state.initialTachoValue){state.userOverrodeTacho=true;}else{state.userOverrodeTacho=false;}
 updateTachoLabel();validateLiveTrip();}
 // ========== V10: OBLÍBENÉ TRASY ==========
+// V13: helper - format favorite's distance (range or fixed) for display
+function favDistLabel(r){
+  if(r.distMin===null||r.distMin===undefined){
+    if(r.distMax===null||r.distMax===undefined)return 'km ručně';
+  }
+  const lo=r.distMin,hi=r.distMax;
+  if((lo!==null&&lo!==undefined)&&(hi!==null&&hi!==undefined)){
+    if(lo===hi)return `${fmtNumber(lo)} km`;
+    return `${fmtNumber(lo)}–${fmtNumber(hi)} km`;
+  }
+  const one=(lo!==null&&lo!==undefined)?lo:hi;
+  return `${fmtNumber(one)} km`;
+}
+// V13: does this favorite have usable distance for the generator?
+function favHasDistance(r){
+  const lo=r.distMin,hi=r.distMax;
+  return (lo!==null&&lo!==undefined)||(hi!==null&&hi!==undefined);
+}
+// V13: pick a concrete distance from a favorite (handles fixed or range)
+function favPickDistance(r){
+  let lo=r.distMin,hi=r.distMax;
+  if((lo===null||lo===undefined)&&(hi===null||hi===undefined))return 0;
+  if(lo===null||lo===undefined)lo=hi;
+  if(hi===null||hi===undefined)hi=lo;
+  if(lo>hi){const t=lo;lo=hi;hi=t;}
+  if(lo===hi)return lo;
+  return lo+Math.floor(Math.random()*(hi-lo+1));
+}
 function favUsageSort(a,b){return (b.usageCount||0)-(a.usageCount||0)||(a.route||'').localeCompare(b.route||'');}
 function getFilteredFavs(searchText){const q=normalizeForCompare(searchText||'');
   if(!q)return state.favRoutes;
@@ -714,7 +805,7 @@ function renderFavList(){const container=document.getElementById('favList');if(!
     if(inCat.length===0)return;
     html+=`<div class="fav-cat-group"><div class="fav-cat-title">${escapeHtml(cat)}<span class="cat-count">${inCat.length}</span></div>`;
     inCat.forEach(r=>{
-      const distStr=r.distance?`${fmtNumber(r.distance)} km`:'km ručně';
+      const distStr=favDistLabel(r);
       html+=`<div class="fav-item" data-fav-id="${r.id}">
 <div class="fav-item-main">
 <div class="fav-item-name">${escapeHtml(r.route)}</div>
@@ -731,6 +822,8 @@ function renderFavCatPills(selectedCat){const container=document.getElementById(
   container.querySelectorAll('.cat-pill').forEach(btn=>{btn.addEventListener('click',()=>{
     state.selectedFavCat=btn.dataset.cat;
     renderFavCatPills(state.selectedFavCat);});});}
+function setFavPurpose(p){state.selectedFavPurpose=p;
+  document.querySelectorAll('[data-fav-purpose]').forEach(b=>{b.classList.toggle('active',b.dataset.favPurpose===p);});}
 function openFavEditModal(favId=null){
   const modal=document.getElementById('favEditModal');
   document.getElementById('favId').value=favId||'';
@@ -738,13 +831,17 @@ function openFavEditModal(favId=null){
   document.getElementById('favDelete').style.display=favId?'':'none';
   if(favId){const r=state.favRoutes.find(x=>x.id===favId);
     if(r){document.getElementById('favRoute').value=r.route||'';
-      document.getElementById('favDistance').value=r.distance||'';
+      document.getElementById('favDistMin').value=(r.distMin!==null&&r.distMin!==undefined)?r.distMin:'';
+      document.getElementById('favDistMax').value=(r.distMax!==null&&r.distMax!==undefined)?r.distMax:'';
       document.getElementById('favNote').value=r.note||'';
-      state.selectedFavCat=r.category||'Pravidelné';}}
+      state.selectedFavCat=r.category||'Pravidelné';
+      setFavPurpose(r.purpose||'Služební');}}
   else{document.getElementById('favRoute').value='';
-    document.getElementById('favDistance').value='';
+    document.getElementById('favDistMin').value='';
+    document.getElementById('favDistMax').value='';
     document.getElementById('favNote').value='';
-    state.selectedFavCat='Pravidelné';}
+    state.selectedFavCat='Pravidelné';
+    setFavPurpose('Služební');}
   renderFavCatPills(state.selectedFavCat);
   modal.classList.add('show');}
 function closeFavEditModal(){document.getElementById('favEditModal').classList.remove('show');}
@@ -752,11 +849,18 @@ function saveFavRoute(){
   const id=document.getElementById('favId').value;
   const route=document.getElementById('favRoute').value.trim();
   if(!route){toast('Zadejte název trasy');return;}
-  const distRaw=document.getElementById('favDistance').value;
-  const distance=distRaw===''?null:Number(distRaw)||0;
+  const minRaw=document.getElementById('favDistMin').value;
+  const maxRaw=document.getElementById('favDistMax').value;
+  let distMin=minRaw===''?null:Number(minRaw)||0;
+  let distMax=maxRaw===''?null:Number(maxRaw)||0;
+  // if only one filled, treat as fixed distance
+  if(distMin!==null&&distMax===null)distMax=distMin;
+  if(distMax!==null&&distMin===null)distMin=distMax;
+  // normalize order
+  if(distMin!==null&&distMax!==null&&distMin>distMax){const t=distMin;distMin=distMax;distMax=t;}
   const existing=id?state.favRoutes.find(x=>x.id===id):null;
   const fav={id:id||uid(),createdAt:existing?existing.createdAt||Date.now():Date.now(),
-    route,category:state.selectedFavCat,distance,
+    route,category:state.selectedFavCat,distMin,distMax,purpose:state.selectedFavPurpose||'Služební',
     note:document.getElementById('favNote').value.trim(),
     usageCount:existing?existing.usageCount||0:0};
   if(id){const idx=state.favRoutes.findIndex(x=>x.id===id);if(idx>=0)state.favRoutes[idx]=fav;toast('Oblíbená trasa upravena');}
@@ -767,6 +871,7 @@ function deleteFavRoute(){
   if(!confirm('Opravdu smazat tuto oblíbenou trasu?'))return;
   state.favRoutes=state.favRoutes.filter(x=>x.id!==id);
   saveFavRoutes();closeFavEditModal();renderFavList();toast('Oblíbená trasa smazána');}
+// favorite route input tools (separate from trip form)
 function favInsertArrow(){const input=document.getElementById('favRoute');const s=input.selectionStart,e=input.selectionEnd,txt=input.value;
   const before=txt.substring(0,s),after=txt.substring(e);
   const nb=before.length>0&&!before.endsWith(' '),na=!after.startsWith(' ');
@@ -786,6 +891,7 @@ function favAutoConvertArrow(e){const input=e.target;const val=input.value;
   const nv=cb+(cb?' ':'')+'→'+(ca?' ':'')+ca;
   if(nv===val)return;input.value=nv;
   const nc=cb.length+(cb?1:0)+1+(ca?1:0);input.setSelectionRange(nc,nc);}
+// ===== Picker (select favorite from trip form) =====
 function openFavPicker(){
   if(state.favRoutes.length===0){toast('Nemáte žádné oblíbené trasy. Přidejte je na záložce Trasy.');return;}
   state.favPickerSearchText='';
@@ -802,7 +908,7 @@ function renderFavPickerList(){const container=document.getElementById('favPicke
     if(inCat.length===0)return;
     html+=`<div class="fav-cat-group"><div class="fav-cat-title">${escapeHtml(cat)}<span class="cat-count">${inCat.length}</span></div>`;
     inCat.forEach(r=>{
-      const distStr=r.distance?`${fmtNumber(r.distance)} km`:'km zadáte ručně';
+      const distStr=favDistLabel(r);
       html+=`<div class="fav-picker-item" data-fav-id="${r.id}">
 <div class="fav-picker-name">${escapeHtml(r.route)}</div>
 <div class="fav-picker-meta">${distStr}${r.usageCount>0?` · ${r.usageCount}× použito`:''}</div>
@@ -814,8 +920,11 @@ ${r.note?`<div class="fav-picker-note">${escapeHtml(r.note)}</div>`:''}
 function applyFavToTrip(favId){
   const r=state.favRoutes.find(x=>x.id===favId);if(!r)return;
   document.getElementById('tripRoute').value=r.route;
-  if(r.distance!==null&&r.distance!==undefined&&r.distance!==''){
-    document.getElementById('tripDistance').value=r.distance;}
+  if(favHasDistance(r)){
+    document.getElementById('tripDistance').value=favPickDistance(r);}
+  // carry the favorite's purpose into the trip form
+  if(r.purpose==='Soukromá'||r.purpose==='Služební')setPurpose(r.purpose);
+  // increment usage
   r.usageCount=(r.usageCount||0)+1;
   saveFavRoutes();
   closeFavPicker();
@@ -825,20 +934,424 @@ function applyFavToTrip(favId){
 function saveTripRouteAsFav(){
   const route=document.getElementById('tripRoute').value.trim();
   if(!route){toast('Nejdřív zadejte trasu');return;}
+  // check duplicate
   const existing=state.favRoutes.find(r=>normalizeForCompare(r.route)===normalizeForCompare(route));
   if(existing){toast('Tato trasa už je mezi oblíbenými');return;}
+  // pre-fill the fav edit modal with current trip's route + distance
   document.getElementById('favId').value='';
   document.getElementById('favEditTitle').textContent='Nová oblíbená trasa';
   document.getElementById('favDelete').style.display='none';
   document.getElementById('favRoute').value=route;
   const tripDist=document.getElementById('tripDistance').value;
-  document.getElementById('favDistance').value=tripDist||'';
+  document.getElementById('favDistMin').value=tripDist||'';
+  document.getElementById('favDistMax').value=tripDist||'';
   document.getElementById('favNote').value='';
   state.selectedFavCat='Pravidelné';
+  setFavPurpose(state.selectedPurpose||'Služební');
   renderFavCatPills(state.selectedFavCat);
   document.getElementById('favEditModal').classList.add('show');}
 
-function bindEvents(){document.getElementById('prevMonth').addEventListener('click',()=>{state.currentMonth--;if(state.currentMonth<0){state.currentMonth=11;state.currentYear--;}render();});document.getElementById('nextMonth').addEventListener('click',()=>{state.currentMonth++;if(state.currentMonth>11){state.currentMonth=0;state.currentYear++;}render();});document.getElementById('fabAdd').addEventListener('click',()=>{if(state.currentScreen==='trasy'){openFavEditModal();}else{openTripModal();}});document.querySelectorAll('.nav-item').forEach(n=>{n.addEventListener('click',()=>{const s=n.dataset.screen;if(s==='home')showScreen('home');else if(s==='vehicle'){loadVehicleForm();showScreen('vehicle');}else if(s==='trasy'){renderFavList();showScreen('trasy');}else{toast('Tato sekce bude dostupná v dalším kroku');}});});document.getElementById('tripModalClose').addEventListener('click',closeTripModal);document.getElementById('tripCancel').addEventListener('click',closeTripModal);document.getElementById('tripSave').addEventListener('click',saveTrip);document.getElementById('tripDelete').addEventListener('click',deleteTrip);document.querySelectorAll('.purpose-toggle button').forEach(b=>{b.addEventListener('click',()=>setPurpose(b.dataset.purpose));});document.getElementById('detailModalClose').addEventListener('click',closeDetailModal);document.getElementById('detailDone').addEventListener('click',closeDetailModal);document.getElementById('detailEdit').addEventListener('click',(e)=>{closeDetailModal();openTripModal(e.target.dataset.id);});document.getElementById('saveVehicle').addEventListener('click',saveVehicleForm);document.getElementById('btnResetTacho').addEventListener('click',resetAllTacho);document.querySelectorAll('.modal-overlay').forEach(o=>{o.addEventListener('click',(e)=>{if(e.target===o)o.classList.remove('show');});});document.getElementById('btnInsertArrow').addEventListener('click',insertArrow);document.getElementById('btnSwapRoute').addEventListener('click',swapRoute);document.getElementById('btnClearRoute').addEventListener('click',clearRoute);
+// ========== V13: AUTOMATICKÉ VYPLNĚNÍ KNIHY JÍZD ==========
+// The generator builds a chain of trips from selected favorite routes.
+// Routes must connect end-to-end (route A ends in X => next route must start in X).
+// We model selected routes as a directed graph (place -> outgoing routes) and do
+// a random walk with backtracking so it never gets stuck producing a broken book.
+
+function genGetStartPlace(){
+  // Chain starts at the last place of the chronologically-last existing trip.
+  // If the book is empty, returns null (caller will start from any selected route).
+  if(state.trips.length===0)return null;
+  const sorted=sortedByDate(state.trips);
+  const last=sorted[sorted.length-1];
+  return getRouteLast(last.route)||null;
+}
+function genGetStartTacho(){
+  // Tacho the generated chain continues from.
+  if(state.trips.length>0){
+    const sorted=sortedByDate(state.trips);
+    return tachoEnd(sorted[sorted.length-1]);
+  }
+  if(state.vehicle&&state.vehicle.pocTacho)return Number(state.vehicle.pocTacho);
+  return 0;
+}
+// Build adjacency: normalized start place -> array of selected routes starting there
+function genBuildGraph(routes){
+  const graph={};
+  routes.forEach(r=>{
+    const from=normalizeForCompare(getRouteFirst(r.route));
+    if(!graph[from])graph[from]=[];
+    graph[from].push(r);
+  });
+  return graph;
+}
+// Check whether a chain of `count` trips can be built starting from startPlace.
+// Pure reachability check (does at least one valid walk of the needed length exist).
+// Uses DFS with a depth cap. Returns {ok:boolean, reason:string}.
+function genCheckChain(routes,startPlaceNorm,minTripsNeeded){
+  if(routes.length===0)return {ok:false,reason:'Nejsou vybrané žádné trasy.'};
+  const graph=genBuildGraph(routes);
+  // Is there any route we can start with?
+  let starts;
+  if(startPlaceNorm===null){
+    starts=routes.slice(); // book empty: can start anywhere
+  }else{
+    starts=graph[startPlaceNorm]||[];
+    if(starts.length===0){
+      return {ok:false,reason:'Žádná vybraná trasa nezačíná tam, kde končí poslední jízda v knize. Přidejte trasu, která tam začíná.'};
+    }
+  }
+  // Try to find ONE walk of length >= minTripsNeeded (with repetition allowed).
+  // Because routes can repeat, if any place has an outgoing route that returns
+  // to a place with outgoing routes, we can walk indefinitely. We just DFS a bit.
+  const cap=Math.max(minTripsNeeded,1);
+  let found=false;
+  function dfs(placeNorm,depth){
+    if(found)return;
+    if(depth>=cap){found=true;return;}
+    const outs=graph[placeNorm]||[];
+    if(outs.length===0)return; // dead end
+    for(const r of outs){
+      dfs(normalizeForCompare(getRouteLast(r.route)),depth+1);
+      if(found)return;
+    }
+  }
+  if(startPlaceNorm===null){
+    for(const r of starts){
+      dfs(normalizeForCompare(getRouteLast(r.route)),1);
+      if(found)break;
+    }
+  }else{
+    dfs(startPlaceNorm,0);
+  }
+  if(!found){
+    return {ok:false,reason:'Vybrané trasy netvoří dostatečně dlouhý navazující řetězec. Přidejte další okružní trasy nebo trasy, které na sebe navazují.'};
+  }
+  return {ok:true,reason:''};
+}
+// Random walk producing an ordered list of route objects forming a valid chain.
+// Generates roughly `targetTrips` trips. Uses backtracking when it hits a dead end.
+function genWalk(routes,startPlaceNorm,targetTrips){
+  const graph=genBuildGraph(routes);
+  const path=[]; // list of chosen route objects
+  // recursive backtracking
+  function shuffle(arr){const a=arr.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));const t=a[i];a[i]=a[j];a[j]=t;}return a;}
+  function walk(placeNorm){
+    if(path.length>=targetTrips)return true;
+    const outs=graph[placeNorm]||[];
+    if(outs.length===0)return false; // dead end -> backtrack
+    for(const r of shuffle(outs)){
+      path.push(r);
+      if(walk(normalizeForCompare(getRouteLast(r.route))))return true;
+      path.pop(); // backtrack
+    }
+    return false;
+  }
+  let okStart;
+  if(startPlaceNorm===null){
+    // book empty: try each possible first route in random order
+    for(const r of shuffle(routes)){
+      path.push(r);
+      if(walk(normalizeForCompare(getRouteLast(r.route)))){okStart=true;break;}
+      path.pop();
+    }
+  }else{
+    okStart=walk(startPlaceNorm);
+  }
+  if(!okStart)return null;
+  return path;
+}
+// Distribute `n` trips across the days between startDate (exclusive of past) and endDate (inclusive),
+// spreading them evenly across the WHOLE range, mostly 1/day, never more than 3/day.
+// Returns an array of ISO date strings, length n, sorted ascending.
+function genDistributeDates(n,startISO,endISO){
+  const start=parseISO(startISO);
+  const end=parseISO(endISO);
+  const dayCount=Math.floor((end-start)/86400000)+1;
+  if(dayCount<=0)return [];
+  // base: how many per day if spread evenly
+  // We'll assign trips to days so they're spread across the whole range.
+  const dates=[];
+  if(n<=dayCount){
+    // pick n distinct days spread evenly across the range
+    const step=dayCount/n;
+    const used=new Set();
+    for(let i=0;i<n;i++){
+      let dayIdx=Math.floor(i*step+Math.random()*step*0.6);
+      if(dayIdx>=dayCount)dayIdx=dayCount-1;
+      while(used.has(dayIdx)&&used.size<dayCount){dayIdx=(dayIdx+1)%dayCount;}
+      used.add(dayIdx);
+      const d=new Date(start.getTime()+dayIdx*86400000);
+      dates.push(d.toISOString().split('T')[0]);
+    }
+  }else{
+    // more trips than days: fill each day, cap 3/day, spread remainder
+    const perDay=new Array(dayCount).fill(0);
+    let remaining=n;
+    // first give everyone 1
+    for(let i=0;i<dayCount&&remaining>0;i++){perDay[i]=1;remaining--;}
+    // then distribute remainder round-robin up to 3
+    let idx=0;
+    while(remaining>0){
+      if(perDay[idx]<3){perDay[idx]++;remaining--;}
+      idx=(idx+1)%dayCount;
+      // safety: if all days at 3 and still remaining, stop
+      if(perDay.every(x=>x>=3))break;
+    }
+    for(let i=0;i<dayCount;i++){
+      for(let k=0;k<perDay[i];k++){
+        const d=new Date(start.getTime()+i*86400000);
+        dates.push(d.toISOString().split('T')[0]);
+      }
+    }
+  }
+  dates.sort();
+  return dates;
+}
+// Main generator. Returns {ok, reason, trips:[...], summary:{...}} where trips are
+// preview trip objects (not yet saved).
+function genGenerate(){
+  const routeIds=state.genSelectedRouteIds;
+  const routes=state.favRoutes.filter(r=>routeIds.includes(r.id)&&favHasDistance(r));
+  const targetDate=document.getElementById('genTargetDate').value;
+  const targetTacho=Number(document.getElementById('genTargetTacho').value)||0;
+  const variance=Number(document.getElementById('genVariance').value)||0;
+  if(routes.length===0)return {ok:false,reason:'Vyberte alespoň jednu oblíbenou trasu s vyplněnou vzdáleností.'};
+  if(!targetDate)return {ok:false,reason:'Zadejte cílové datum.'};
+  const startTacho=genGetStartTacho();
+  if(targetTacho<=startTacho)return {ok:false,reason:`Cílový tachometr (${fmtNumber(targetTacho)}) musí být vyšší než aktuální stav (${fmtNumber(startTacho)} km).`};
+  const kmNeeded=targetTacho-startTacho;
+  // Determine start date: day after the last existing trip, or today, whichever later; but not after targetDate
+  let startDateISO;
+  if(state.trips.length>0){
+    const sorted=sortedByDate(state.trips);
+    const lastDate=sorted[sorted.length-1].dateStart;
+    const d=new Date(parseISO(lastDate).getTime()+86400000);
+    startDateISO=d.toISOString().split('T')[0];
+  }else{
+    startDateISO=todayISO();
+  }
+  if(startDateISO>targetDate)return {ok:false,reason:'Cílové datum musí být po datu poslední jízdy v knize.'};
+  // Estimate average trip distance to guess how many trips we need
+  let avgDist=0;
+  routes.forEach(r=>{
+    let lo=r.distMin,hi=r.distMax;
+    if(lo===null||lo===undefined)lo=hi;
+    if(hi===null||hi===undefined)hi=lo;
+    avgDist+=(lo+hi)/2;
+  });
+  avgDist=avgDist/routes.length;
+  if(avgDist<=0)return {ok:false,reason:'Vybrané trasy nemají platnou vzdálenost.'};
+  let targetTrips=Math.max(1,Math.round(kmNeeded/avgDist));
+  // V13 FIX: don't generate more trips than the date range can hold (max 3/day).
+  // If capped, trips will simply have larger distances to still reach the target tacho.
+  const rangeDays=Math.floor((parseISO(targetDate)-parseISO(startDateISO))/86400000)+1;
+  const maxTrips=Math.max(1,rangeDays*3);
+  let cappedByDays=false;
+  if(targetTrips>maxTrips){targetTrips=maxTrips;cappedByDays=true;}
+  const startPlaceNorm=genGetStartPlace()===null?null:normalizeForCompare(genGetStartPlace());
+  // Build the chain (random walk + backtracking). Try a few times for a good length.
+  let chain=null;
+  for(let attempt=0;attempt<40;attempt++){
+    const c=genWalk(routes,startPlaceNorm,targetTrips);
+    if(c&&c.length>0){chain=c;break;}
+  }
+  if(!chain){
+    return {ok:false,reason:'Nepodařilo se sestavit navazující řetězec z vybraných tras. Zkuste přidat další okružní trasy.'};
+  }
+  // Assign a concrete distance to each trip (range pick + variance), keep running km
+  const tripsRaw=chain.map(r=>{
+    let base=favPickDistance(r);
+    // apply +-variance%
+    if(variance>0){
+      const factor=1+((Math.random()*2-1)*variance/100);
+      base=Math.round(base*factor);
+    }
+    if(base<1)base=1;
+    return {route:r.route,purpose:r.purpose||'Služební',distance:base};
+  });
+  // Adjust total to hit targetTacho as closely as possible: tweak the LAST trip.
+  let sum=tripsRaw.reduce((s,t)=>s+t.distance,0);
+  let diff=kmNeeded-sum; // positive => need more km, negative => too much
+  if(tripsRaw.length>0){
+    const last=tripsRaw[tripsRaw.length-1];
+    const adjusted=last.distance+diff;
+    if(adjusted>=1){
+      last.distance=adjusted;
+      diff=0;
+    }else{
+      // last trip would go below 1km; spread the difference across trips from the end
+      // (reduce distances) until covered, keeping each >=1
+      let need=-(adjusted-1); // how much we still must remove beyond making last=1
+      last.distance=1;
+      diff=kmNeeded-tripsRaw.reduce((s,t)=>s+t.distance,0);
+      // diff now negative (still too much) or could be ok; trim from the end
+      let i=tripsRaw.length-2;
+      while(diff<0&&i>=0){
+        const canRemove=tripsRaw[i].distance-1;
+        const remove=Math.min(canRemove,-diff);
+        tripsRaw[i].distance-=remove;
+        diff+=remove;
+        i--;
+      }
+    }
+  }
+  // Distribute dates across the whole range
+  const dates=genDistributeDates(tripsRaw.length,startDateISO,targetDate);
+  if(dates.length!==tripsRaw.length){
+    return {ok:false,reason:'Nepodařilo se rozložit jízdy do dnů. Zkuste vzdálenější cílové datum.'};
+  }
+  // Build preview trips (chain order preserved; dates ascending so chain stays in order)
+  const previewTrips=tripsRaw.map((t,i)=>({
+    route:t.route,purpose:t.purpose,distance:t.distance,dateStart:dates[i],dateEnd:dates[i]
+  }));
+  const finalSum=previewTrips.reduce((s,t)=>s+t.distance,0);
+  const finalTacho=startTacho+finalSum;
+  return {
+    ok:true,reason:'',
+    trips:previewTrips,
+    summary:{
+      count:previewTrips.length,
+      kmTotal:finalSum,
+      startTacho,finalTacho,targetTacho,
+      tachoDiff:targetTacho-finalTacho,
+      startDate:startDateISO,targetDate,
+      cappedByDays:cappedByDays
+    }
+  };
+}
+
+// ---- Generator UI ----
+function openGenerator(){
+  state.genSelectedRouteIds=[];
+  state.genPreview=null;
+  // default target date: end of current displayed month
+  const lastDay=new Date(state.currentYear,state.currentMonth+1,0);
+  document.getElementById('genTargetDate').value=lastDay.toISOString().split('T')[0];
+  document.getElementById('genTargetTacho').value='';
+  document.getElementById('genVariance').value=2;
+  document.getElementById('genVarianceLabel').textContent='2 %';
+  document.getElementById('genPreviewArea').innerHTML='';
+  document.getElementById('genChainCheck').innerHTML='';
+  const startTacho=genGetStartTacho();
+  const startPlace=genGetStartPlace();
+  document.getElementById('genTachoInfo').textContent=
+    `Aktuální stav: ${fmtNumber(startTacho)} km`+(startPlace?` · řetězec naváže od „${startPlace}"`:' · kniha je prázdná, řetězec začne libovolnou trasou');
+  renderGenRouteList();
+  showScreen('generator');
+}
+function renderGenRouteList(){
+  const container=document.getElementById('genRouteList');if(!container)return;
+  const usable=state.favRoutes.filter(favHasDistance);
+  const unusable=state.favRoutes.filter(r=>!favHasDistance(r));
+  if(state.favRoutes.length===0){
+    container.innerHTML=`<div class="fav-empty"><div class="fav-empty-icon">⭐</div><div>Nemáte žádné oblíbené trasy.<br>Nejdřív si je vytvořte na záložce Trasy.</div></div>`;
+    return;
+  }
+  let html='';
+  usable.forEach(r=>{
+    const sel=state.genSelectedRouteIds.includes(r.id);
+    html+=`<div class="gen-route-item${sel?' selected':''}" data-gen-route="${r.id}">
+<div class="gen-route-check">${sel?'✓':''}</div>
+<div class="gen-route-info">
+<div class="gen-route-name">${escapeHtml(r.route)}</div>
+<div class="gen-route-meta">${favDistLabel(r)} · ${escapeHtml(r.purpose||'Služební')} · ${escapeHtml(r.category)}</div>
+</div>
+</div>`;
+  });
+  if(unusable.length>0){
+    html+=`<div class="tip-text" style="margin-top:10px;">${unusable.length} ${unusable.length===1?'trasa nemá':'tras nemá'} vyplněnou vzdálenost, ${unusable.length===1?'nelze ji':'nelze je'} použít. Doplňte km na záložce Trasy.</div>`;
+  }
+  container.innerHTML=html;
+  container.querySelectorAll('.gen-route-item').forEach(el=>{
+    el.addEventListener('click',()=>{
+      const id=el.dataset.genRoute;
+      const i=state.genSelectedRouteIds.indexOf(id);
+      if(i>=0)state.genSelectedRouteIds.splice(i,1);
+      else state.genSelectedRouteIds.push(id);
+      renderGenRouteList();
+      updateGenChainCheck();
+    });
+  });
+  updateGenChainCheck();
+}
+function updateGenChainCheck(){
+  const el=document.getElementById('genChainCheck');if(!el)return;
+  const routes=state.favRoutes.filter(r=>state.genSelectedRouteIds.includes(r.id)&&favHasDistance(r));
+  if(routes.length===0){el.innerHTML='';return;}
+  const startPlace=genGetStartPlace();
+  const startNorm=startPlace===null?null:normalizeForCompare(startPlace);
+  // a light check: need at least 1 trip
+  const check=genCheckChain(routes,startNorm,1);
+  if(check.ok){
+    el.innerHTML=`<div class="gen-chain-ok"><span>✓</span><div>Vybrané trasy tvoří navazující řetězec. Můžete generovat.</div></div>`;
+  }else{
+    el.innerHTML=`<div class="gen-chain-bad"><span>⚠️</span><div>${escapeHtml(check.reason)}</div></div>`;
+  }
+}
+function runGenerator(){
+  const result=genGenerate();
+  const area=document.getElementById('genPreviewArea');
+  if(!result.ok){
+    area.innerHTML=`<div class="gen-chain-bad"><span>⚠️</span><div>${escapeHtml(result.reason)}</div></div>`;
+    state.genPreview=null;
+    return;
+  }
+  state.genPreview=result.trips;
+  const s=result.summary;
+  let diffStr='';
+  if(s.tachoDiff===0)diffStr='Cílový tachometr trefen přesně. ✓';
+  else if(s.tachoDiff>0)diffStr=`Do cíle zbývá ${fmtNumber(s.tachoDiff)} km (lze doplnit ručně).`;
+  else diffStr=`Překročeno o ${fmtNumber(-s.tachoDiff)} km.`;
+  if(s.cappedByDays)diffStr+=' Jízdy mají delší vzdálenosti, protože se do zvoleného období nevešlo víc jízd.';
+  let html=`<div class="gen-preview-summary">
+<b>${s.count}</b> ${s.count===1?'jízda':(s.count<5?'jízdy':'jízd')} · celkem <b>${fmtNumber(s.kmTotal)} km</b><br>
+Tachometr: ${fmtNumber(s.startTacho)} → <b>${fmtNumber(s.finalTacho)} km</b> (cíl ${fmtNumber(s.targetTacho)})<br>
+${diffStr}
+</div>
+<div class="gen-preview-header">Náhled jízd</div>`;
+  result.trips.forEach(t=>{
+    html+=`<div class="gen-preview-trip">
+<div class="gen-preview-date">${formatDateShort(t.dateStart)}</div>
+<div class="gen-preview-route">${escapeHtml(t.route)}</div>
+<div class="gen-preview-km">${fmtNumber(t.distance)} km</div>
+</div>`;
+  });
+  html+=`<button class="btn btn-primary" id="btnConfirmGenerate" style="width:100%;margin-top:16px;">✓ Zapsat ${s.count} ${s.count===1?'jízdu':(s.count<5?'jízdy':'jízd')} do knihy</button>
+<button class="btn btn-secondary" id="btnDiscardGenerate" style="width:100%;margin-top:8px;">Zahodit náhled</button>`;
+  area.innerHTML=html;
+  document.getElementById('btnConfirmGenerate').addEventListener('click',confirmGenerate);
+  document.getElementById('btnDiscardGenerate').addEventListener('click',()=>{
+    state.genPreview=null;area.innerHTML='';
+  });
+}
+function confirmGenerate(){
+  if(!state.genPreview||state.genPreview.length===0){toast('Není co zapsat');return;}
+  const n=state.genPreview.length;
+  if(!confirm(`Zapsat ${n} vygenerovaných jízd do knihy? Půjdou normálně upravit nebo smazat.`))return;
+  // append trips; assign sortOrder via computeSortOrderForNew so same-day order is right
+  state.genPreview.forEach(pt=>{
+    const tachoStartVal=0; // will be recalculated by the chain anyway
+    const sortOrderVal=computeSortOrderForNew(pt.dateStart,tachoStartVal);
+    const trip={id:uid(),createdAt:Date.now(),sortOrder:sortOrderVal,
+      dateStart:pt.dateStart,dateEnd:pt.dateEnd||pt.dateStart,
+      route:pt.route,purpose:pt.purpose||'Služební',
+      tachoStart:tachoStartVal,distance:pt.distance,
+      note:'',tachoManual:false};
+    state.trips.push(trip);
+  });
+  recalcTachoChain();
+  state.genPreview=null;
+  // jump to the month of the target date so the user sees the result
+  const td=parseISO(document.getElementById('genTargetDate').value);
+  state.currentMonth=td.getMonth();
+  state.currentYear=td.getFullYear();
+  showScreen('home');
+  render();
+  toast(`Zapsáno ${n} jízd do knihy`);
+}
+
+function bindEvents(){document.getElementById('prevMonth').addEventListener('click',()=>{state.currentMonth--;if(state.currentMonth<0){state.currentMonth=11;state.currentYear--;}render();});document.getElementById('nextMonth').addEventListener('click',()=>{state.currentMonth++;if(state.currentMonth>11){state.currentMonth=0;state.currentYear++;}render();});document.getElementById('fabAdd').addEventListener('click',()=>{if(state.currentScreen==='trasy'){openFavEditModal();}else{openTripModal();}});document.querySelectorAll('.nav-item').forEach(n=>{n.addEventListener('click',()=>{const s=n.dataset.screen;if(s==='home')showScreen('home');else if(s==='vehicle'){loadVehicleForm();showScreen('vehicle');}else if(s==='trasy'){renderFavList();showScreen('trasy');}else{toast('Tato sekce bude dostupná v dalším kroku');}});});document.getElementById('tripModalClose').addEventListener('click',closeTripModal);document.getElementById('tripCancel').addEventListener('click',closeTripModal);document.getElementById('tripSave').addEventListener('click',saveTrip);document.getElementById('tripDelete').addEventListener('click',deleteTrip);document.querySelectorAll('.purpose-toggle button[data-purpose]').forEach(b=>{b.addEventListener('click',()=>setPurpose(b.dataset.purpose));});
+document.querySelectorAll('[data-fav-purpose]').forEach(b=>{b.addEventListener('click',()=>setFavPurpose(b.dataset.favPurpose));});document.getElementById('detailModalClose').addEventListener('click',closeDetailModal);document.getElementById('detailDone').addEventListener('click',closeDetailModal);document.getElementById('detailEdit').addEventListener('click',(e)=>{closeDetailModal();openTripModal(e.target.dataset.id);});document.getElementById('saveVehicle').addEventListener('click',saveVehicleForm);document.getElementById('btnResetTacho').addEventListener('click',resetAllTacho);document.querySelectorAll('.modal-overlay').forEach(o=>{o.addEventListener('click',(e)=>{if(e.target===o)o.classList.remove('show');});});document.getElementById('btnInsertArrow').addEventListener('click',insertArrow);document.getElementById('btnSwapRoute').addEventListener('click',swapRoute);document.getElementById('btnClearRoute').addEventListener('click',clearRoute);
 const routeInput=document.getElementById('tripRoute');
 routeInput.addEventListener('input',autoConvertArrow);
 routeInput.addEventListener('input',validateLiveTrip);
@@ -869,7 +1382,12 @@ document.getElementById('btnPickFav').addEventListener('click',openFavPicker);
 document.getElementById('btnSaveFav').addEventListener('click',saveTripRouteAsFav);
 document.getElementById('favPickerClose').addEventListener('click',closeFavPicker);
 document.getElementById('favPickerCancel').addEventListener('click',closeFavPicker);
-document.getElementById('favPickerSearch').addEventListener('input',function(){state.favPickerSearchText=this.value;renderFavPickerList();});}
+document.getElementById('favPickerSearch').addEventListener('input',function(){state.favPickerSearchText=this.value;renderFavPickerList();});
+// V13: generator events
+document.getElementById('btnOpenGenerator').addEventListener('click',openGenerator);
+document.getElementById('genVariance').addEventListener('input',function(){document.getElementById('genVarianceLabel').textContent=this.value+' %';});
+document.getElementById('btnGenerate').addEventListener('click',runGenerator);
+document.getElementById('btnGeneratorBack').addEventListener('click',()=>{showScreen('home');render();});}
 loadData();
 bindEvents();render();
 if(!state.vehicle){loadVehicleForm();showScreen('vehicle');toast('Vítejte! Nastavte prosím vaše vozidlo.',3500);}
