@@ -185,7 +185,7 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
 <body>
 <div class="header">
 <div class="header-content">
-<div class="header-title">🚗 Kniha jízd<span class="version-tag">v14</span></div>
+<div class="header-title">🚗 Kniha jízd<span class="version-tag">v13</span></div>
 <div class="header-subtitle" id="vehicleSubtitle">Nastavte vozidlo →</div>
 </div>
 <div class="month-selector">
@@ -454,35 +454,6 @@ state.trips.forEach(t=>{delete t.tachoManual;});
 recalcTachoChain();
 render();
 toast('Všechny tachometry přepočítány');}
-function isMultiDay(trip){return trip&&trip.dateEnd&&trip.dateStart&&trip.dateEnd>trip.dateStart;}
-function findOverlappingTrips(dateStart,dateEnd,excludeId){
-if(!dateStart)return [];
-const endA=dateEnd||dateStart;
-return state.trips.filter(function(t){
-if(t.id===excludeId)return false;
-const startB=t.dateStart||'';
-const endB=t.dateEnd||startB;
-if(!startB)return false;
-return dateStart<=endB&&endA>=startB;
-});
-}
-function genListAvailableDays(startISO,endISO){
-const start=parseISO(startISO);
-const end=parseISO(endISO);
-if(end<start)return [];
-const days=[];
-const multi=state.trips.filter(isMultiDay);
-for(let t=start.getTime();t<=end.getTime();t+=86400000){
-const d=new Date(t).toISOString().split('T')[0];
-let blocked=false;
-for(let i=0;i<multi.length;i++){
-const m=multi[i];
-if(d>=m.dateStart&&d<=m.dateEnd){blocked=true;break;}
-}
-if(!blocked)days.push(d);
-}
-return days;
-}
 function validateTrip(trip,allTrips){const issues={errors:[],warnings:[]};
 if(trip.dateEnd&&trip.dateStart&&trip.dateEnd<trip.dateStart){issues.errors.push({type:'date',msg:'Datum konce je dřív než datum začátku'});}
 const otherTrips=allTrips.filter(t=>t.id!==trip.id);
@@ -496,14 +467,6 @@ if(prev){const prevEnd=tachoEnd(prev);const myStart=Number(trip.tachoStart||0);
 const days=trip.dateEnd&&trip.dateStart?Math.max(1,Math.round((parseISO(trip.dateEnd)-parseISO(trip.dateStart))/86400000)+1):1;
 const kmPerDay=Number(trip.distance||0)/days;
 if(kmPerDay>1000){issues.warnings.push({type:'longDistance',msg:`Vysoká vzdálenost: ${fmtNumber(kmPerDay)} km/den`});}
-// V14: kolize s vícedenními jízdami
-const overlaps=findOverlappingTrips(trip.dateStart,trip.dateEnd||trip.dateStart,trip.id);
-const multiOver=overlaps.find(function(o){return isMultiDay(o);});
-if(multiOver){
-issues.errors.push({type:'dateOverlap',msg:`Termín se překrývá s vícedenní jízdou (${formatDateShort(multiOver.dateStart)}–${formatDateShort(multiOver.dateEnd)}: ${multiOver.route||'?'})`});
-}else if(isMultiDay(trip)&&overlaps.length>0){
-issues.errors.push({type:'dateOverlap',msg:`Tato vícedenní jízda by překryla jiné jízdy v knize.`});
-}
 return issues;}
 function formatDateShort(iso){if(!iso)return '';const d=parseISO(iso);return `${d.getDate()}.${d.getMonth()+1}.`;}
 function renderHeader(){document.getElementById('monthName').textContent=MONTHS_CS[state.currentMonth]+' '+state.currentYear;const subtitle=state.vehicle?`${state.vehicle.znacka} ${state.vehicle.model} · ${state.vehicle.spz}`:'Nastavte vozidlo →';document.getElementById('vehicleSubtitle').textContent=subtitle;}
@@ -536,7 +499,7 @@ if(showReorder){reorderHtml=`<div class="trip-reorder"><button class="reorder-bt
 return `<div class="${cls}" data-id="${t.id}">
 <div class="trip-content" data-detail-id="${t.id}">
 <div class="trip-date"><div class="trip-day">${d.getDate()}</div><div class="trip-month">${MONTHS_CS_SHORT[d.getMonth()]}</div></div>
-<div class="trip-info"><div class="trip-route">${escapeHtml(t.route||'(bez trasy)')}</div><div class="trip-meta"><span class="badge ${badge}">${t.purpose}</span>${(t.dateEnd&&t.dateEnd!==t.dateStart)?`<span style="color:var(--warn);font-weight:600;">📅 ${Math.round((parseISO(t.dateEnd)-parseISO(t.dateStart))/86400000)+1} dní</span>`:''}${t.distance?`<span>${fmtNumber(t.distance)} km</span>`:''}${tachoStr?`<span>${tachoStr}</span>`:''}</div>${issueHtml}</div>
+<div class="trip-info"><div class="trip-route">${escapeHtml(t.route||'(bez trasy)')}</div><div class="trip-meta"><span class="badge ${badge}">${t.purpose}</span>${t.distance?`<span>${fmtNumber(t.distance)} km</span>`:''}${tachoStr?`<span>${tachoStr}</span>`:''}</div>${issueHtml}</div>
 </div>
 ${reorderHtml}
 </div>`;}).join('');
@@ -751,14 +714,9 @@ if(minOrder!==Infinity)return minOrder-1;
 }
 return getNextSortOrder();
 }
-function saveTrip(){const id=document.getElementById(‘tripId’).value;const dateStart=document.getElementById(‘tripDateStart’).value;const dateEndForCheck=document.getElementById(‘tripDateEnd’).value||dateStart;const route=document.getElementById(‘tripRoute’).value.trim();
+function saveTrip(){const id=document.getElementById(‘tripId’).value;const dateStart=document.getElementById(‘tripDateStart’).value;const route=document.getElementById(‘tripRoute’).value.trim();
 if(!dateStart){toast(‘Zadejte datum začátku’);return;}
 if(!route){toast(‘Zadejte trasu’);return;}
-// V14: zablokovat uložení při kolizi
-const ovrlp=findOverlappingTrips(dateStart,dateEndForCheck,id);
-const mOver=ovrlp.find(function(o){return isMultiDay(o);});
-if(mOver){toast(‘Termín koliduje s vícedenní jízdou – nelze uložit’);return;}
-if(dateEndForCheck>dateStart&&ovrlp.length>0){toast(‘Vícedenní termín by překryl jiné jízdy – nelze uložit’);return;}
 const existing=id?state.trips.find(x=>x.id===id):null;
 const tachoStartVal=Number(document.getElementById(‘tripTachoStart’).value)||0;
 const sortOrderVal=existing?existing.sortOrder:computeSortOrderForNew(dateStart,tachoStartVal);
@@ -1105,35 +1063,6 @@ okStart=walk(startPlaceNorm);
 if(!okStart)return null;
 return path;
 }
-function genDistributeDatesV14(n,availableDays){
-const dayCount=availableDays.length;
-if(dayCount<=0)return [];
-const dates=[];
-if(n<=dayCount){
-const step=dayCount/n;
-const used={};
-for(let i=0;i<n;i++){
-let dayIdx=Math.floor(i*step+Math.random()*step*0.6);
-if(dayIdx>=dayCount)dayIdx=dayCount-1;
-while(used[dayIdx]&&Object.keys(used).length<dayCount){dayIdx=(dayIdx+1)%dayCount;}
-used[dayIdx]=true;
-dates.push(availableDays[dayIdx]);
-}
-}else{
-const perDay=new Array(dayCount).fill(0);
-let remaining=n;
-for(let i=0;i<dayCount&&remaining>0;i++){perDay[i]=1;remaining–;}
-let idx=0;
-while(remaining>0){
-if(perDay[idx]<3){perDay[idx]++;remaining–;}
-idx=(idx+1)%dayCount;
-if(perDay.every(function(x){return x>=3;}))break;
-}
-for(let i=0;i<dayCount;i++){for(let k=0;k<perDay[i];k++){dates.push(availableDays[i]);}}
-}
-dates.sort();
-return dates;
-}
 // Distribute `n` trips across the days between startDate (exclusive of past) and endDate (inclusive),
 // spreading them evenly across the WHOLE range, mostly 1/day, never more than 3/day.
 // Returns an array of ISO date strings, length n, sorted ascending.
@@ -1216,10 +1145,9 @@ avgDist+=(lo+hi)/2;
 avgDist=avgDist/routes.length;
 if(avgDist<=0)return {ok:false,reason:‘Vybrané trasy nemají platnou vzdálenost.’};
 let targetTrips=Math.max(1,Math.round(kmNeeded/avgDist));
-// V14: spočítat reálně dostupné dny (vyloučit ty pokryté vícedenními jízdami)
-const availableDays=genListAvailableDays(startDateISO,targetDate);
-if(availableDays.length===0){return {ok:false,reason:‘V tomto období nejsou žádné volné dny. Vícedenní jízdy pokrývají celé období.’};}
-const rangeDays=availableDays.length;
+// V13 FIX: don’t generate more trips than the date range can hold (max 3/day).
+// If capped, trips will simply have larger distances to still reach the target tacho.
+const rangeDays=Math.floor((parseISO(targetDate)-parseISO(startDateISO))/86400000)+1;
 const maxTrips=Math.max(1,rangeDays*3);
 let cappedByDays=false;
 if(targetTrips>maxTrips){targetTrips=maxTrips;cappedByDays=true;}
@@ -1270,8 +1198,8 @@ i–;
 }
 }
 }
-// V14: rozložit do dostupných dnů
-const dates=genDistributeDatesV14(tripsRaw.length,availableDays);
+// Distribute dates across the whole range
+const dates=genDistributeDates(tripsRaw.length,startDateISO,targetDate);
 if(dates.length!==tripsRaw.length){
 return {ok:false,reason:‘Nepodařilo se rozložit jízdy do dnů. Zkuste vzdálenější cílové datum.’};
 }
