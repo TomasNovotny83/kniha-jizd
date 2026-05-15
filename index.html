@@ -184,7 +184,7 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
 <body>
 <div class="header">
 <div class="header-content">
-<div class="header-title">🚗 Kniha jízd<span class="version-tag">v13</span></div>
+<div class="header-title">🚗 Kniha jízd<span class="version-tag">v14</span></div>
 <div class="header-subtitle" id="vehicleSubtitle">Nastavte vozidlo →</div>
 </div>
 <div class="month-selector">
@@ -1391,6 +1391,14 @@ document.getElementById('btnGeneratorBack').addEventListener('click',()=>{showSc
 loadData();
 bindEvents();render();
 if(!state.vehicle){loadVehicleForm();showScreen('vehicle');toast('Vítejte! Nastavte prosím vaše vozidlo.',3500);}
+;(function(){
+window.isMultiDay=function(trip){return trip&&trip.dateEnd&&trip.dateStart&&trip.dateEnd>trip.dateStart;};
+window.findOverlappingTrips=function(dateStart,dateEnd,excludeId){if(!dateStart)return [];var endA=dateEnd||dateStart;return state.trips.filter(function(t){if(t.id===excludeId)return false;var startB=t.dateStart||"";var endB=t.dateEnd||startB;if(!startB)return false;return dateStart<=endB&&endA>=startB;});};
+var origSave=window.saveTrip||saveTrip;
+window.saveTrip=function(){var id=document.getElementById("tripId").value;var dateStart=document.getElementById("tripDateStart").value;var dateEnd=document.getElementById("tripDateEnd").value||dateStart;var overlaps=findOverlappingTrips(dateStart,dateEnd,id);var multi=overlaps.find(function(o){return isMultiDay(o);});if(multi){toast("Termín koliduje s vícedenní jízdou - nelze uložit");return;}if(dateEnd>dateStart&&overlaps.length>0){toast("Vícedenní termín by překryl jiné jízdy - nelze uložit");return;}return origSave.apply(this,arguments);};
+document.getElementById("tripSave").removeEventListener("click",saveTrip);
+document.getElementById("tripSave").addEventListener("click",window.saveTrip);
+})();
 </script>
 </body>
 </html>
