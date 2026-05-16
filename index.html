@@ -1,4 +1,4 @@
- <!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="cs">
 <head>
 <meta charset="UTF-8">
@@ -1194,9 +1194,12 @@ function genGenerate(){
   // Determine start date: day after the last existing trip, or today, whichever later; but not after targetDate
   let startDateISO;
   if(state.trips.length>0){
-    const sorted=sortedByDate(state.trips);
-    const lastDate=sorted[sorted.length-1].dateStart;
-    const d=new Date(parseISO(lastDate).getTime()+86400000);
+    let lastEnd='';
+    state.trips.forEach(function(t){
+      const e=t.dateEnd||t.dateStart||'';
+      if(e>lastEnd)lastEnd=e;
+    });
+    const d=new Date(parseISO(lastEnd).getTime()+86400000);
     startDateISO=d.toISOString().split('T')[0];
   }else{
     startDateISO=todayISO();
