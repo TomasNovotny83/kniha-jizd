@@ -222,7 +222,7 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
 <body>
 <div class="header">
 <div class="header-content">
-<div class="header-title">🚗 Kniha jízd<span class="version-tag">v15</span></div>
+<div class="header-title">🚗 Kniha jízd<span class="version-tag">v16</span></div>
 <div class="header-subtitle" id="vehicleSubtitle">Nastavte vozidlo →</div>
 </div>
 <div class="month-selector">
@@ -270,6 +270,7 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
 <div class="gen-step-label" style="margin-top:18px;">3. Cílový stav tachometru (km)</div>
 <input type="number" class="form-input" id="genTargetTacho" placeholder="Kolik má tachometr ukazovat k cílovému datu">
 <div id="genTachoInfo" class="tip-text" style="margin-top:6px;"></div>
+<div id="genAnchorInfo" style="margin-top:10px;"></div>
 <div class="gen-step-label" style="margin-top:18px;">4. Náhodná odchylka vzdálenosti</div>
 <div style="display:flex;align-items:center;gap:12px;">
 <input type="range" id="genVariance" min="0" max="10" value="2" style="flex:1;">
@@ -522,7 +523,7 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
 <div class="toast" id="toast"></div>
 <script>
 'use strict';
-const state={trips:[],vehicle:null,favRoutes:[],phm:[],currentMonth:new Date().getMonth(),currentYear:new Date().getFullYear(),currentScreen:'home',selectedPurpose:'Služební',userOverrodeTacho:false,initialTachoValue:null,userEditedDateEnd:false,lastCursorPos:null,selectedFavCat:'Pravidelné',favSearchText:'',favPickerSearchText:'',selectedFavPurpose:'Služební',genSelectedRouteIds:[],genPreview:null,fuelFullTank:true,fuelPendingPhotoBlob:undefined,fuelPendingPhotoUrl:null,fuelSelectedTripId:''};
+const state={trips:[],vehicle:null,favRoutes:[],phm:[],currentMonth:new Date().getMonth(),currentYear:new Date().getFullYear(),currentScreen:'home',selectedPurpose:'Služební',userOverrodeTacho:false,initialTachoValue:null,userEditedDateEnd:false,lastCursorPos:null,selectedFavCat:'Pravidelné',favSearchText:'',favPickerSearchText:'',selectedFavPurpose:'Služební',genSelectedRouteIds:[],genPreview:null,genAnchors:null,genAnchorLinks:null,fuelFullTank:true,fuelPendingPhotoBlob:undefined,fuelPendingPhotoUrl:null,fuelSelectedTripId:''};
 const FAV_CATEGORIES=['Pravidelné','Klienti','Servis','Sklad','Soukromé','Ostatní'];
 const MONTHS_CS=['Leden','Únor','Březen','Duben','Květen','Červen','Červenec','Srpen','Září','Říjen','Listopad','Prosinec'];
 const MONTHS_CS_SHORT=['Led','Úno','Bře','Dub','Kvě','Čer','Črc','Srp','Zář','Říj','Lis','Pro'];
@@ -1314,6 +1315,152 @@ for(let i=0;i<dayCount;i++){for(let k=0;k<perDay[i];k++){dates.push(availableDay
 dates.sort();
 return dates;
 }
+// ========== V16: fixní body (kotvy) z tankování ==========
+// Vrátí tankování spadající do generovaného období [startISO..endISO],
+// seřazená podle data. Každé se stane kotvou pro generátor.
+function genGetAnchors(startISO,endISO){
+  return state.phm.filter(p=>{
+    if(!p.date)return false;
+    return p.date>=startISO&&p.date<=endISO;
+  }).sort((a,b)=>{
+    const c=(a.date||'').localeCompare(b.date||'');
+    if(c!==0)return c;
+    return (Number(a.tacho)||0)-(Number(b.tacho)||0);
+  });
+}
+// Rozloží slova názvu na porovnatelné tokeny: malá písmena, bez diakritiky,
+// jen slova 3+ znaky (krátké útržky jako "OMV", "MB", "čs" se zahodí).
+function genPlaceTokens(text){
+  if(!text)return [];
+  const norm=normalizeForCompare(text);
+  return norm.split(/[^a-z0-9]+/).filter(w=>w.length>=3);
+}
+// Zjistí, zda se místo tankování (název pumpy) potkává s trasou.
+// Shoda = aspoň jedno společné slovo 3+ znaky. Krátké útržky se ignorují.
+function genPlaceMatchesRoute(fuelPlace,route){
+  const ft=genPlaceTokens(fuelPlace);
+  if(ft.length===0)return false;
+  const rt=genPlaceTokens(route);
+  if(rt.length===0)return false;
+  const rset={};
+  rt.forEach(w=>{rset[w]=true;});
+  return ft.some(w=>rset[w]);
+}
+// ========== V16: rozdělení dat jízd s respektem ke kotvám ==========
+// Vstup: počet jízd n, dostupné dny, kotvy (tankování).
+// Logika "datum svaté": každá kotva má svůj den. Generátor zajistí,
+// že v den kotvy je aspoň jedna jízda. Zbylé jízdy rozloží mezi ostatní dny.
+// Vrací pole dat délky n, seřazené vzestupně.
+function genDistributeDatesV16(n,availableDays,anchors){
+  const dayCount=availableDays.length;
+  if(dayCount<=0||n<=0)return [];
+  const daySet={};
+  availableDays.forEach(d=>{daySet[d]=true;});
+  // dny, kde MUSÍ být jízda kvůli kotvě (jen ty, co padnou do dostupných dnů)
+  const anchorDays=[];
+  (anchors||[]).forEach(a=>{
+    if(daySet[a.date]&&anchorDays.indexOf(a.date)<0)anchorDays.push(a.date);
+  });
+  // když je kotev víc než jízd, nejde to – vrátíme prázdné (ošetří volající)
+  if(anchorDays.length>n)return [];
+  const dates=[];
+  // 1) každý kotevní den dostane jednu jízdu
+  anchorDays.forEach(d=>dates.push(d));
+  // 2) zbylé jízdy rozdělíme mezi všechny dostupné dny (i kotevní můžou dostat víc)
+  let remaining=n-dates.length;
+  if(remaining>0){
+    if(n<=dayCount){
+      // dost dnů – preferuj dny bez kotvy, ať jsou jízdy rozprostřené
+      const freeDays=availableDays.filter(d=>anchorDays.indexOf(d)<0);
+      const pool=freeDays.length>0?freeDays.slice():availableDays.slice();
+      // rovnoměrně rozmístit remaining do poolu
+      const step=pool.length/remaining;
+      const used={};
+      for(let i=0;i<remaining;i++){
+        let idx=Math.floor(i*step+Math.random()*step*0.6);
+        if(idx>=pool.length)idx=pool.length-1;
+        let guard=0;
+        while(used[idx]&&guard<pool.length){idx=(idx+1)%pool.length;guard++;}
+        used[idx]=true;
+        dates.push(pool[idx]);
+      }
+    }else{
+      // víc jízd než dnů – rozprostři rovnoměrně, max 3 na den
+      const perDay={};
+      availableDays.forEach(d=>{perDay[d]=0;});
+      anchorDays.forEach(d=>{perDay[d]=1;});
+      let idx=0;
+      let guard=0;
+      while(remaining>0&&guard<n*dayCount+10){
+        const d=availableDays[idx];
+        if(perDay[d]<3){perDay[d]++;remaining--;}
+        idx=(idx+1)%dayCount;
+        guard++;
+      }
+      availableDays.forEach(d=>{
+        const extra=perDay[d]-(anchorDays.indexOf(d)>=0?1:0);
+        for(let k=0;k<extra;k++)dates.push(d);
+      });
+    }
+  }
+  dates.sort();
+  return dates;
+}
+// ========== V16: napojení kotev na vygenerované jízdy ==========
+// Vstup: previewTrips (jízdy s dateStart/distance, seřazené), startTacho, anchors.
+// Pro každou kotvu najde jízdu v její den (datum svaté). Když je v ten den
+// víc jízd, vybere tu, u které tacho nejlíp sedí; když sedí i místo, má přednost.
+// Kilometry kolem kotvy se NEMĚNÍ tady (datum svaté = km se neohýbají kvůli kotvě);
+// místo toho jen vyhodnotíme, jak dobře tacho vyšlo, a označíme nesedící.
+// Vrací {links:[{anchorId,tripIndex}], unmatched:[anchorId], tachoWarnings:[{anchorId,expected,actual}]}.
+function genApplyAnchors(previewTrips,startTacho,anchors){
+  const links=[];
+  const unmatched=[];
+  const tachoWarnings=[];
+  // spočítej tacho na začátku každé jízdy (kumulativně)
+  const tachoAtStart=[];
+  let running=startTacho;
+  for(let i=0;i<previewTrips.length;i++){
+    tachoAtStart[i]=running;
+    running+=Number(previewTrips[i].distance)||0;
+  }
+  (anchors||[]).forEach(a=>{
+    // kandidátní jízdy = ty ve stejný den jako kotva
+    const sameDay=[];
+    for(let i=0;i<previewTrips.length;i++){
+      if(previewTrips[i].dateStart===a.date)sameDay.push(i);
+    }
+    if(sameDay.length===0){
+      unmatched.push(a.id);
+      return;
+    }
+    const aTacho=Number(a.tacho)||0;
+    // ohodnoť každého kandidáta: rozdíl tacha + bonus za shodu místa
+    let best=-1,bestScore=Infinity,bestPlaceHit=false;
+    sameDay.forEach(idx=>{
+      const tStart=tachoAtStart[idx];
+      const tEnd=tStart+(Number(previewTrips[idx].distance)||0);
+      // jak daleko je tacho účtenky od rozsahu jízdy
+      let tachoGap;
+      if(aTacho>=tStart&&aTacho<=tEnd)tachoGap=0;
+      else tachoGap=Math.min(Math.abs(aTacho-tStart),Math.abs(aTacho-tEnd));
+      const placeHit=genPlaceMatchesRoute(a.place,previewTrips[idx].route);
+      // skóre: tacho rozdíl, shoda místa ho výrazně zvýhodní
+      const score=tachoGap-(placeHit?100000:0);
+      if(score<bestScore){bestScore=score;best=idx;bestPlaceHit=placeHit;}
+    });
+    if(best<0){unmatched.push(a.id);return;}
+    links.push({anchorId:a.id,tripIndex:best});
+    // vyhodnoť, jestli tacho sedí (tolerance 30 km)
+    const tStart=tachoAtStart[best];
+    const tEnd=tStart+(Number(previewTrips[best].distance)||0);
+    if(aTacho<tStart-30||aTacho>tEnd+30){
+      tachoWarnings.push({anchorId:a.id,expectedFrom:tStart,expectedTo:tEnd,actual:aTacho});
+    }
+  });
+  return {links,unmatched,tachoWarnings};
+}
+
 function genGenerate(){
   const routeIds=state.genSelectedRouteIds;
   const routes=state.favRoutes.filter(r=>routeIds.includes(r.id)&&favHasDistance(r));
@@ -1393,25 +1540,80 @@ function genGenerate(){
       }
     }
   }
-  const dates=genDistributeDatesV14(tripsRaw.length,availableDays);
+  // V16: kotvy = tankování v generovaném období
+  const anchors=genGetAnchors(startDateISO,targetDate);
+  // počet kotevních dnů, které padnou do volných dnů
+  const daySetForAnchors={};
+  availableDays.forEach(d=>{daySetForAnchors[d]=true;});
+  const anchorDaysCount=anchors.filter(a=>daySetForAnchors[a.date])
+    .map(a=>a.date)
+    .filter((d,i,arr)=>arr.indexOf(d)===i).length;
+  // jízd musí být aspoň tolik, kolik je kotevních dnů
+  if(anchorDaysCount>tripsRaw.length){
+    targetTrips=Math.min(maxTrips,anchorDaysCount);
+    // přegeneruj řetězec na delší
+    let chain2=null;
+    for(let attempt=0;attempt<40;attempt++){
+      const c=genWalk(routes,startPlaceNorm,targetTrips);
+      if(c&&c.length>0){chain2=c;break;}
+    }
+    if(chain2&&chain2.length>=anchorDaysCount){
+      tripsRaw.length=0;
+      chain2.forEach(r=>{
+        let base=favPickDistance(r);
+        if(variance>0){
+          const factor=1+((Math.random()*2-1)*variance/100);
+          base=Math.round(base*factor);
+        }
+        if(base<1)base=1;
+        tripsRaw.push({route:r.route,purpose:r.purpose||'Služební',distance:base});
+      });
+      // znovu dorovnej km na cílový tachometr
+      let sum2=tripsRaw.reduce((s,t)=>s+t.distance,0);
+      let diff2=kmNeeded-sum2;
+      const last2=tripsRaw[tripsRaw.length-1];
+      const adj2=last2.distance+diff2;
+      if(adj2>=1){last2.distance=adj2;}
+      else{
+        last2.distance=1;
+        diff2=kmNeeded-tripsRaw.reduce((s,t)=>s+t.distance,0);
+        let i2=tripsRaw.length-2;
+        while(diff2<0&&i2>=0){
+          const canRem=tripsRaw[i2].distance-1;
+          const rem=Math.min(canRem,-diff2);
+          tripsRaw[i2].distance-=rem;diff2+=rem;i2--;
+        }
+      }
+    }
+  }
+  const dates=genDistributeDatesV16(tripsRaw.length,availableDays,anchors);
   if(dates.length!==tripsRaw.length){
-    return {ok:false,reason:'Nepodařilo se rozložit jízdy do dnů. Zkuste vzdálenější cílové datum.'};
+    return {ok:false,reason:'Nepodařilo se rozložit jízdy do dnů kolem tankování. Zkuste vybrat víc tras nebo vzdálenější cílové datum.'};
   }
   const previewTrips=tripsRaw.map((t,i)=>({
     route:t.route,purpose:t.purpose,distance:t.distance,dateStart:dates[i],dateEnd:dates[i]
   }));
+  // V16: napoj kotvy na vygenerované jízdy
+  const anchorResult=genApplyAnchors(previewTrips,startTacho,anchors);
   const finalSum=previewTrips.reduce((s,t)=>s+t.distance,0);
   const finalTacho=startTacho+finalSum;
   return {
     ok:true,reason:'',
     trips:previewTrips,
+    anchors:anchors,
+    anchorLinks:anchorResult.links,
+    anchorUnmatched:anchorResult.unmatched,
+    anchorTachoWarnings:anchorResult.tachoWarnings,
     summary:{
       count:previewTrips.length,
       kmTotal:finalSum,
       startTacho,finalTacho,targetTacho,
       tachoDiff:targetTacho-finalTacho,
       startDate:startDateISO,targetDate,
-      cappedByDays:cappedByDays
+      cappedByDays:cappedByDays,
+      anchorCount:anchors.length,
+      anchorMatched:anchorResult.links.length,
+      anchorUnmatchedCount:anchorResult.unmatched.length
     }
   };
 }
@@ -1429,8 +1631,35 @@ function openGenerator(){
   const startPlace=genGetStartPlace();
   document.getElementById('genTachoInfo').textContent=
     `Aktuální stav: ${fmtNumber(startTacho)} km`+(startPlace?` · řetězec naváže od „${startPlace}"`:' · kniha je prázdná, řetězec začne libovolnou trasou');
+  updateGenAnchorInfo();
   renderGenRouteList();
   showScreen('generator');
+}
+// V16: ukáže, kolik tankování spadá do generovaného období (kotvy)
+function updateGenAnchorInfo(){
+  const el=document.getElementById('genAnchorInfo');if(!el)return;
+  const targetDate=document.getElementById('genTargetDate').value;
+  if(!targetDate){el.innerHTML='';return;}
+  // start období = den po poslední jízdě, nebo dnes
+  let startDateISO;
+  if(state.trips.length>0){
+    let lastEnd='';
+    state.trips.forEach(function(t){
+      const e=t.dateEnd||t.dateStart||'';
+      if(e>lastEnd)lastEnd=e;
+    });
+    const d=new Date(parseISO(lastEnd).getTime()+86400000);
+    startDateISO=d.toISOString().split('T')[0];
+  }else{
+    startDateISO=todayISO();
+  }
+  const anchors=genGetAnchors(startDateISO,targetDate);
+  if(anchors.length===0){
+    el.innerHTML=`<div class="field-hint info"><span>⛽</span><div>V tomto období nemáte žádné tankování. Generátor postaví knihu volně.</div></div>`;
+    return;
+  }
+  const list=anchors.map(a=>`${formatDateShort(a.date)} ${escapeHtml(a.place||'tankování')}`).join(', ');
+  el.innerHTML=`<div class="field-hint info"><span>⛽</span><div><b>${anchors.length}</b> ${anchors.length===1?'tankování':(anchors.length<5?'tankování':'tankování')} v tomto období bude použito jako pevný bod: ${list}. Generátor zajistí jízdu v každý tento den a tankování k ní napojí.</div></div>`;
 }
 function renderGenRouteList(){
   const container=document.getElementById('genRouteList');if(!container)return;
@@ -1489,55 +1718,98 @@ function runGenerator(){
     return;
   }
   state.genPreview=result.trips;
+  // V16: ulož kotevní data pro confirmGenerate
+  state.genAnchors=result.anchors||[];
+  state.genAnchorLinks=result.anchorLinks||[];
   const s=result.summary;
   let diffStr='';
   if(s.tachoDiff===0)diffStr='Cílový tachometr trefen přesně. ✓';
   else if(s.tachoDiff>0)diffStr=`Do cíle zbývá ${fmtNumber(s.tachoDiff)} km (lze doplnit ručně).`;
   else diffStr=`Překročeno o ${fmtNumber(-s.tachoDiff)} km.`;
   if(s.cappedByDays)diffStr+=' Jízdy mají delší vzdálenosti, protože se do zvoleného období nevešlo víc jízd.';
+  // V16: která jízda (index) má napojenou kotvu
+  const tripHasAnchor={};
+  (result.anchorLinks||[]).forEach(l=>{tripHasAnchor[l.tripIndex]=true;});
+  // V16: tacho upozornění podle anchorId
+  const tachoWarnById={};
+  (result.anchorTachoWarnings||[]).forEach(w=>{tachoWarnById[w.anchorId]=w;});
   let html=`<div class="gen-preview-summary">
 <b>${s.count}</b> ${s.count===1?'jízda':(s.count<5?'jízdy':'jízd')} · celkem <b>${fmtNumber(s.kmTotal)} km</b><br>
 Tachometr: ${fmtNumber(s.startTacho)} → <b>${fmtNumber(s.finalTacho)} km</b> (cíl ${fmtNumber(s.targetTacho)})<br>
-${diffStr}
-</div>
-<div class="gen-preview-header">Náhled jízd</div>`;
-  result.trips.forEach(t=>{
+${diffStr}`;
+  if(s.anchorCount>0){
+    html+=`<br>⛽ Tankování: <b>${s.anchorMatched}</b> z ${s.anchorCount} napojeno na jízdy`;
+    if(s.anchorUnmatchedCount>0)html+=` · ${s.anchorUnmatchedCount} bez jízdy`;
+  }
+  html+=`</div>`;
+  // V16: upozornění na nenapárovaná tankování
+  if(result.anchorUnmatched&&result.anchorUnmatched.length>0){
+    html+=`<div class="gen-chain-bad" style="margin-bottom:10px;"><span>⚠️</span><div>U ${result.anchorUnmatched.length} ${result.anchorUnmatched.length===1?'tankování se nepodařilo':'tankování se nepodařilo'} najít jízdu ve stejný den. Po zápisu ${result.anchorUnmatched.length===1?'ho':'je'} přiřaďte ručně, nebo přidejte trasu na ten den.</div></div>`;
+  }
+  html+=`<div class="gen-preview-header">Náhled jízd</div>`;
+  result.trips.forEach((t,i)=>{
+    const fuelMark=tripHasAnchor[i]?' <span class="trip-fuel-icon">⛽</span>':'';
     html+=`<div class="gen-preview-trip">
 <div class="gen-preview-date">${formatDateShort(t.dateStart)}</div>
-<div class="gen-preview-route">${escapeHtml(t.route)}</div>
+<div class="gen-preview-route">${escapeHtml(t.route)}${fuelMark}</div>
 <div class="gen-preview-km">${fmtNumber(t.distance)} km</div>
 </div>`;
   });
+  // V16: výpis tacho upozornění u kotev
+  if(result.anchorTachoWarnings&&result.anchorTachoWarnings.length>0){
+    html+=`<div class="gen-preview-header">⚠️ Tankování – kontrola tachometru</div>`;
+    result.anchorTachoWarnings.forEach(w=>{
+      const a=(result.anchors||[]).find(x=>x.id===w.anchorId);
+      if(!a)return;
+      html+=`<div class="field-hint warning" style="margin-bottom:6px;"><span>⚠️</span><div>${formatDateShort(a.date)} ${escapeHtml(a.place||'tankování')}: účtenka ${fmtNumber(w.actual)} km, ale jízda v ten den vychází ${fmtNumber(w.expectedFrom)}–${fmtNumber(w.expectedTo)} km.</div></div>`;
+    });
+  }
   html+=`<button class="btn btn-primary" id="btnConfirmGenerate" style="width:100%;margin-top:16px;">✓ Zapsat ${s.count} ${s.count===1?'jízdu':(s.count<5?'jízdy':'jízd')} do knihy</button>
 <button class="btn btn-secondary" id="btnDiscardGenerate" style="width:100%;margin-top:8px;">Zahodit náhled</button>`;
   area.innerHTML=html;
   document.getElementById('btnConfirmGenerate').addEventListener('click',confirmGenerate);
   document.getElementById('btnDiscardGenerate').addEventListener('click',()=>{
-    state.genPreview=null;area.innerHTML='';
+    state.genPreview=null;state.genAnchors=null;state.genAnchorLinks=null;area.innerHTML='';
   });
 }
 function confirmGenerate(){
   if(!state.genPreview||state.genPreview.length===0){toast('Není co zapsat');return;}
   const n=state.genPreview.length;
   if(!confirm(`Zapsat ${n} vygenerovaných jízd do knihy? Půjdou normálně upravit nebo smazat.`))return;
-  state.genPreview.forEach(pt=>{
+  // V16: vytvoř jízdy a zapamatuj si jejich id podle indexu v náhledu
+  const newTripIds=[];
+  state.genPreview.forEach((pt,i)=>{
     const tachoStartVal=0;
     const sortOrderVal=computeSortOrderForNew(pt.dateStart,tachoStartVal);
-    const trip={id:uid(),createdAt:Date.now(),sortOrder:sortOrderVal,
+    const newId=uid();
+    newTripIds[i]=newId;
+    const trip={id:newId,createdAt:Date.now(),sortOrder:sortOrderVal,
       dateStart:pt.dateStart,dateEnd:pt.dateEnd||pt.dateStart,
       route:pt.route,purpose:pt.purpose||'Služební',
       tachoStart:tachoStartVal,distance:pt.distance,
       note:'',tachoManual:false};
     state.trips.push(trip);
   });
+  // V16: napoj kotvy – nastav tripId u tankování podle anchorLinks
+  let linked=0;
+  (state.genAnchorLinks||[]).forEach(l=>{
+    const tripId=newTripIds[l.tripIndex];
+    if(!tripId)return;
+    const p=state.phm.find(x=>x.id===l.anchorId);
+    if(p){p.tripId=tripId;linked++;}
+  });
+  if(linked>0)savePhm();
   recalcTachoChain();
   state.genPreview=null;
+  state.genAnchors=null;
+  state.genAnchorLinks=null;
   const td=parseISO(document.getElementById('genTargetDate').value);
   state.currentMonth=td.getMonth();
   state.currentYear=td.getFullYear();
   showScreen('home');
   render();
-  toast(`Zapsáno ${n} jízd do knihy`);
+  if(linked>0)toast(`Zapsáno ${n} jízd, ${linked} tankování napojeno`);
+  else toast(`Zapsáno ${n} jízd do knihy`);
 }
 // ========== V15: PHM – výpočetní funkce ==========
 // Nákupy PHM seřazené chronologicky (datum, pak tacho jako sekundární).
@@ -2129,6 +2401,7 @@ function bindEvents(){
     document.getElementById('genVarianceLabel').textContent=e.target.value+' %';
   });
   document.getElementById('btnGenerate').addEventListener('click',runGenerator);
+  document.getElementById('genTargetDate').addEventListener('change',updateGenAnchorInfo);
   // ----- tripModal -----
   document.getElementById('tripModalClose').addEventListener('click',closeTripModal);
   document.getElementById('tripCancel').addEventListener('click',closeTripModal);
