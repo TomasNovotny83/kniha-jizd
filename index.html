@@ -222,7 +222,7 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
 <body>
 <div class="header">
 <div class="header-content">
-<div class="header-title">🚗 Kniha jízd<span class="version-tag">v16</span></div>
+<div class="header-title">🚗 Kniha jízd<span class="version-tag">v16.1</span></div>
 <div class="header-subtitle" id="vehicleSubtitle">Nastavte vozidlo →</div>
 </div>
 <div class="month-selector">
@@ -1590,9 +1590,16 @@ function genGenerate(){
   if(dates.length!==tripsRaw.length){
     return {ok:false,reason:'Nepodařilo se rozložit jízdy do dnů kolem tankování. Zkuste vybrat víc tras nebo vzdálenější cílové datum.'};
   }
-  const previewTrips=tripsRaw.map((t,i)=>({
-    route:t.route,purpose:t.purpose,distance:t.distance,dateStart:dates[i],dateEnd:dates[i]
-  }));
+  // V16: přiřaď jízdám tachoStart jako průběžný součet od startTacho.
+  // Tím sortedByDate řadí jízdy stejného dne podle tacha = pořadí řetězce
+  // zůstane navazující i po rozhození dat.
+  let tachoRun=startTacho;
+  const previewTrips=tripsRaw.map((t,i)=>{
+    const tStart=tachoRun;
+    tachoRun+=t.distance;
+    return {route:t.route,purpose:t.purpose,distance:t.distance,
+      dateStart:dates[i],dateEnd:dates[i],tachoStart:tStart};
+  });
   // V16: napoj kotvy na vygenerované jízdy
   const anchorResult=genApplyAnchors(previewTrips,startTacho,anchors);
   const finalSum=previewTrips.reduce((s,t)=>s+t.distance,0);
@@ -1776,17 +1783,18 @@ function confirmGenerate(){
   if(!state.genPreview||state.genPreview.length===0){toast('Není co zapsat');return;}
   const n=state.genPreview.length;
   if(!confirm(`Zapsat ${n} vygenerovaných jízd do knihy? Půjdou normálně upravit nebo smazat.`))return;
-  // V16: vytvoř jízdy a zapamatuj si jejich id podle indexu v náhledu
+  // V16: vytvoř jízdy a zapamatuj si jejich id podle indexu v náhledu.
+  // sortOrder musí růst přesně podle pořadí v řetězci, aby jízdy ve stejný
+  // den zůstaly ve správném navazujícím pořadí (konec jedné = začátek další).
   const newTripIds=[];
+  const baseSortOrder=getNextSortOrder();
   state.genPreview.forEach((pt,i)=>{
-    const tachoStartVal=0;
-    const sortOrderVal=computeSortOrderForNew(pt.dateStart,tachoStartVal);
     const newId=uid();
     newTripIds[i]=newId;
-    const trip={id:newId,createdAt:Date.now(),sortOrder:sortOrderVal,
+    const trip={id:newId,createdAt:Date.now(),sortOrder:baseSortOrder+i,
       dateStart:pt.dateStart,dateEnd:pt.dateEnd||pt.dateStart,
       route:pt.route,purpose:pt.purpose||'Služební',
-      tachoStart:tachoStartVal,distance:pt.distance,
+      tachoStart:Number(pt.tachoStart)||0,distance:pt.distance,
       note:'',tachoManual:false};
     state.trips.push(trip);
   });
@@ -1876,18 +1884,25 @@ function phmTachoEstimateForDate(dateISO){
   if(sameDay.length>0){
     let lo=Infinity,hi=-Infinity;
     sameDay.forEach(t=>{lo=Math.min(lo,Number(t.tachoStart||0));hi=Math.max(hi,tachoEnd(t));});
-    return {min:lo,max:hi};
+    return {min:lo,max:hi,beyond:false};
   }
-  // mimo jízdní dny – vezmi konec poslední jízdy před datem
-  let before=null;
+  // V16: datum mimo jízdní den – zjisti, zda je uvnitř rozsahu knihy
+  let before=null,after=null;
   for(let i=0;i<sorted.length;i++){
-    if((sorted[i].dateStart||'')<=dateISO)before=sorted[i];
+    const ds=sorted[i].dateStart||'';
+    if(ds<=dateISO)before=sorted[i];
+    if(ds>dateISO&&after===null)after=sorted[i];
   }
-  if(before){const e=tachoEnd(before);return {min:e,max:e};}
+  // beyond=true znamená, že datum je za koncem (nebo před začátkem) knihy –
+  // odhad je jen orientační, kontrola tachometru se na něj nesmí spoléhat
+  if(before&&!after){
+    const e=tachoEnd(before);return {min:e,max:e,beyond:true};
+  }
+  if(before){const e=tachoEnd(before);return {min:e,max:e,beyond:false};}
   // datum je před první jízdou
   const first=sorted[0];
   const s=Number(first.tachoStart||0);
-  return {min:s,max:s};
+  return {min:s,max:s,beyond:true};
 }
 // ========== V15: PHM – render obrazovky ==========
 function renderPhmScreen(){
@@ -1933,7 +1948,7 @@ function renderPhmScreen(){
     if(!p.tripId)warnings.push('Nepřiřazeno k jízdě');
     if(p.tacho!=null&&p.tacho!==''){
       const est=phmTachoEstimateForDate(p.date);
-      if(est){
+      if(est&&!est.beyond){
         const tol=30;
         if(Number(p.tacho)<est.min-tol||Number(p.tacho)>est.max+tol){
           warnings.push(`Tacho ${fmtNumber(p.tacho)} km nesedí s knihou (${fmtNumber(est.min)}–${fmtNumber(est.max)} km)`);
@@ -2082,6 +2097,11 @@ function validateFuelTacho(){
   const tacho=Number(tachoRaw)||0;
   const est=phmTachoEstimateForDate(date);
   if(!est)return;
+  // V16: datum mimo rozsah knihy – odhad není závazný, kontrolu vynech
+  if(est.beyond){
+    hint.innerHTML=`<div class="field-hint info"><span>ℹ️</span><div>K tomuto datu zatím není jízda v knize, tachometr nelze ověřit. Po doplnění jízd se zkontroluje.</div></div>`;
+    return;
+  }
   const tol=30;
   if(tacho<est.min-tol||tacho>est.max+tol){
     inputEl.classList.add('has-warning');
@@ -2313,7 +2333,7 @@ function showFuelDetail(id){
   }
   if(p.tacho!=null&&p.tacho!==''){
     const est=phmTachoEstimateForDate(p.date);
-    if(est){
+    if(est&&!est.beyond){
       const tol=30;
       if(Number(p.tacho)<est.min-tol||Number(p.tacho)>est.max+tol){
         issuesHtml+=`<div class="field-hint warning" style="margin-bottom:8px;"><span>⚠️</span><div>Tachometr ${fmtNumber(p.tacho)} km nesedí s knihou jízd (${fmtNumber(est.min)}–${fmtNumber(est.max)} km k tomuto datu).</div></div>`;
