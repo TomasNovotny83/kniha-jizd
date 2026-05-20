@@ -222,7 +222,7 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
 <body>
 <div class="header">
 <div class="header-content">
-<div class="header-title">🚗 Kniha jízd<span class="version-tag">v16.3</span></div>
+<div class="header-title">🚗 Kniha jízd<span class="version-tag">v16.4</span></div>
 <div class="header-subtitle" id="vehicleSubtitle">Nastavte vozidlo →</div>
 </div>
 <div class="month-selector">
@@ -265,13 +265,20 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
 <div class="gen-step-label">1. Vyberte oblíbené trasy</div>
 <div class="tip-text" style="margin-top:0;margin-bottom:8px;">Použít lze jen trasy s vyplněnou vzdáleností. Zaškrtnuté trasy musí na sebe navazovat (konec jedné = začátek další).</div>
 <div id="genRouteList"></div>
-<div class="gen-step-label" style="margin-top:22px;">2. Cílové datum</div>
+<div class="gen-step-label" style="margin-top:22px;">2. Počáteční bod</div>
+<div class="tip-text" style="margin-top:0;margin-bottom:8px;">Předvyplní se podle poslední jízdy v knize. Můžete přepsat, když chcete začít jinde.</div>
+<div class="form-row-double" style="margin-bottom:0;">
+<div><label class="form-label">Počáteční datum</label><input type="date" class="form-input" id="genStartDate"></div>
+<div><label class="form-label">Počáteční tachometr</label><input type="number" class="form-input" id="genStartTacho" placeholder="km"></div>
+</div>
+<div id="genStartInfo" class="tip-text" style="margin-top:6px;"></div>
+<div class="gen-step-label" style="margin-top:22px;">3. Cílové datum</div>
 <input type="date" class="form-input" id="genTargetDate">
-<div class="gen-step-label" style="margin-top:18px;">3. Cílový stav tachometru (km)</div>
+<div class="gen-step-label" style="margin-top:18px;">4. Cílový stav tachometru (km)</div>
 <input type="number" class="form-input" id="genTargetTacho" placeholder="Kolik má tachometr ukazovat k cílovému datu">
 <div id="genTachoInfo" class="tip-text" style="margin-top:6px;"></div>
 <div id="genAnchorInfo" style="margin-top:10px;"></div>
-<div class="gen-step-label" style="margin-top:18px;">4. Náhodná odchylka vzdálenosti</div>
+<div class="gen-step-label" style="margin-top:18px;">5. Náhodná odchylka vzdálenosti</div>
 <div style="display:flex;align-items:center;gap:12px;">
 <input type="range" id="genVariance" min="0" max="10" value="2" style="flex:1;">
 <span id="genVarianceLabel" style="font-weight:700;color:var(--primary);min-width:42px;text-align:right;">2 %</span>
@@ -1606,22 +1613,14 @@ function genGenerate(){
   const variance=Number(document.getElementById('genVariance').value)||0;
   if(routes.length===0)return {ok:false,reason:'Vyberte alespoň jednu oblíbenou trasu s vyplněnou vzdáleností.'};
   if(!targetDate)return {ok:false,reason:'Zadejte cílové datum.'};
-  const startTacho=genGetStartTacho();
-  if(targetTacho<=startTacho)return {ok:false,reason:`Cílový tachometr (${fmtNumber(targetTacho)}) musí být vyšší než aktuální stav (${fmtNumber(startTacho)} km).`};
+  // V16.4: počáteční bod – z polí, s fallbackem na auto-hodnoty
+  const startDateRaw=document.getElementById('genStartDate').value;
+  const startTachoRaw=document.getElementById('genStartTacho').value;
+  let startDateISO=startDateRaw||genAutoStartDate();
+  const startTacho=startTachoRaw!==''?Number(startTachoRaw)||0:genGetStartTacho();
+  if(targetTacho<=startTacho)return {ok:false,reason:`Cílový tachometr (${fmtNumber(targetTacho)}) musí být vyšší než počáteční stav (${fmtNumber(startTacho)} km).`};
   const kmNeeded=targetTacho-startTacho;
-  let startDateISO;
-  if(state.trips.length>0){
-    let lastEnd='';
-    state.trips.forEach(function(t){
-      const e=t.dateEnd||t.dateStart||'';
-      if(e>lastEnd)lastEnd=e;
-    });
-    const d=new Date(parseISO(lastEnd).getTime()+86400000);
-    startDateISO=d.toISOString().split('T')[0];
-  }else{
-    startDateISO=todayISO();
-  }
-  if(startDateISO>targetDate)return {ok:false,reason:'Cílové datum musí být po datu poslední jízdy v knize.'};
+  if(startDateISO>targetDate)return {ok:false,reason:'Cílové datum musí být po počátečním datu generování.'};
   const availableDays=genListAvailableDays(startDateISO,targetDate);
   if(availableDays.length===0){return {ok:false,reason:'V tomto období nejsou žádné volné dny. Vícedenní jízdy pokrývají celé období.'};}
   // odhad: vejde se potřebný počet jízd do dostupných dnů? (max 3/den)
@@ -1643,13 +1642,27 @@ function genGenerate(){
   // jen kotvy s platným tachem a datem ve volných dnech se použijí jako pevné body
   const daySetForAnchors={};
   availableDays.forEach(d=>{daySetForAnchors[d]=true;});
-  const validAnchors=anchors.filter(a=>{
+  const anchorsInRange=anchors.filter(a=>{
     if(!daySetForAnchors[a.date])return false;
     return a.tacho!=null&&a.tacho!=='';
   }).sort((x,y)=>{
     const c=(x.date||'').localeCompare(y.date||'');
     if(c!==0)return c;
     return (Number(x.tacho)||0)-(Number(y.tacho)||0);
+  });
+  // V16.4: kotvy, jejichž tacho je pod počátečním stavem nebo couvá proti
+  // předchozí kotvě – nesplnitelné, generátor by musel jet tachometr zpět.
+  const anchorBelowStart=[]; // {anchor, prevTacho}
+  const validAnchors=[];
+  let chkTacho=startTacho;
+  anchorsInRange.forEach(a=>{
+    const at=Number(a.tacho)||0;
+    if(at<chkTacho){
+      anchorBelowStart.push({anchor:a,prevTacho:chkTacho});
+    }else{
+      validAnchors.push(a);
+      chkTacho=at;
+    }
   });
   // ===== V16.2: stavba knihy po úsecích mezi kotvami =====
   // Každý úsek má cílový tacho (tacho kotvy, poslední úsek = targetTacho)
@@ -1762,6 +1775,7 @@ function genGenerate(){
     anchorLinks:anchorLinks,
     anchorUnmatched:anchorUnmatched,
     anchorTachoWarnings:anchorTachoWarnings,
+    anchorBelowStart:anchorBelowStart,
     summary:{
       count:previewTrips.length,
       kmTotal:finalSum,
@@ -1787,30 +1801,50 @@ function openGenerator(){
   document.getElementById('genChainCheck').innerHTML='';
   const startTacho=genGetStartTacho();
   const startPlace=genGetStartPlace();
+  // V16.4: předvyplň počáteční datum a tacho (auto-režim, lze přepsat)
+  document.getElementById('genStartDate').value=genAutoStartDate();
+  document.getElementById('genStartTacho').value=startTacho;
   document.getElementById('genTachoInfo').textContent=
     `Aktuální stav: ${fmtNumber(startTacho)} km`+(startPlace?` · řetězec naváže od „${startPlace}"`:' · kniha je prázdná, řetězec začne libovolnou trasou');
+  updateGenStartInfo();
   updateGenAnchorInfo();
   renderGenRouteList();
   showScreen('generator');
 }
-// V16: ukáže, kolik tankování spadá do generovaného období (kotvy)
-function updateGenAnchorInfo(){
-  const el=document.getElementById('genAnchorInfo');if(!el)return;
-  const targetDate=document.getElementById('genTargetDate').value;
-  if(!targetDate){el.innerHTML='';return;}
-  // start období = den po poslední jízdě, nebo dnes
-  let startDateISO;
+// V16.4: auto-navržené počáteční datum = den po poslední jízdě v knize, jinak dnes
+function genAutoStartDate(){
   if(state.trips.length>0){
     let lastEnd='';
     state.trips.forEach(function(t){
       const e=t.dateEnd||t.dateStart||'';
       if(e>lastEnd)lastEnd=e;
     });
-    const d=new Date(parseISO(lastEnd).getTime()+86400000);
-    startDateISO=d.toISOString().split('T')[0];
-  }else{
-    startDateISO=todayISO();
+    return new Date(parseISO(lastEnd).getTime()+86400000).toISOString().split('T')[0];
   }
+  return todayISO();
+}
+// V16.4: informační hláška pod počátečními poli – ukáže, zda jsou auto nebo přepsané
+function updateGenStartInfo(){
+  const el=document.getElementById('genStartInfo');if(!el)return;
+  const autoDate=genAutoStartDate();
+  const autoTacho=genGetStartTacho();
+  const curDate=document.getElementById('genStartDate').value;
+  const curTacho=document.getElementById('genStartTacho').value;
+  const dateChanged=curDate!==autoDate;
+  const tachoChanged=curTacho!==''&&Number(curTacho)!==autoTacho;
+  if(dateChanged||tachoChanged){
+    el.innerHTML=`<span style="color:var(--orange);">✏️ Počáteční bod jste přepsali ručně. Auto návrh: ${formatDateShort(autoDate)} · ${fmtNumber(autoTacho)} km.</span>`;
+  }else{
+    el.textContent='Vyplněno automaticky podle poslední jízdy v knize.';
+  }
+}
+// V16: ukáže, kolik tankování spadá do generovaného období (kotvy)
+function updateGenAnchorInfo(){
+  const el=document.getElementById('genAnchorInfo');if(!el)return;
+  const targetDate=document.getElementById('genTargetDate').value;
+  if(!targetDate){el.innerHTML='';return;}
+  // V16.4: start období bere z pole počátečního data (fallback na auto)
+  const startDateISO=document.getElementById('genStartDate').value||genAutoStartDate();
   const anchors=genGetAnchors(startDateISO,targetDate);
   if(anchors.length===0){
     el.innerHTML=`<div class="field-hint info"><span>⛽</span><div>V tomto období nemáte žádné tankování. Generátor postaví knihu volně.</div></div>`;
@@ -1900,6 +1934,13 @@ ${diffStr}`;
     if(s.anchorUnmatchedCount>0)html+=` · ${s.anchorUnmatchedCount} bez jízdy`;
   }
   html+=`</div>`;
+  // V16.4: upozornění na kotvy s tachem nižším než počáteční stav (nesplnitelné)
+  if(result.anchorBelowStart&&result.anchorBelowStart.length>0){
+    result.anchorBelowStart.forEach(item=>{
+      const a=item.anchor;
+      html+=`<div class="gen-chain-bad" style="margin-bottom:10px;"><span>⚠️</span><div>Tankování ${formatDateShort(a.date)} ${escapeHtml(a.place||'')}: účtenka ukazuje <b>${fmtNumber(Number(a.tacho)||0)} km</b>, ale to je <b>méně</b> než stav tachometru ${fmtNumber(item.prevTacho)} km, na kterém už kniha v tu chvíli je. Tachometr nemůže couvnout. Zkontrolujte číslo na účtence, nebo upravte předchozí jízdy. Toto tankování generátor přeskočil.</div></div>`;
+    });
+  }
   // V16: upozornění na nenapárovaná tankování
   if(result.anchorUnmatched&&result.anchorUnmatched.length>0){
     html+=`<div class="gen-chain-bad" style="margin-bottom:10px;"><span>⚠️</span><div>U ${result.anchorUnmatched.length} ${result.anchorUnmatched.length===1?'tankování se nepodařilo':'tankování se nepodařilo'} najít jízdu ve stejný den. Po zápisu ${result.anchorUnmatched.length===1?'ho':'je'} přiřaďte ručně, nebo přidejte trasu na ten den.</div></div>`;
@@ -2472,7 +2513,6 @@ function renderFuelTripPickerList(dateISO){
 }
 // ========== V15: detail tankování ==========
 function showFuelDetail(id){
- try{
   const p=state.phm.find(x=>x.id===id);
   if(!p)return;
   const d=parseISO(p.date);
@@ -2531,56 +2571,9 @@ function showFuelDetail(id){
   });
   document.getElementById('fuelDetailEdit').dataset.id=id;
   document.getElementById('fuelDetailModal').classList.add('show');
- }catch(e){
-  console.error('showFuelDetail chyba:',e);
-  toast('Detail tankování se nepodařilo zobrazit');
- }
 }
 function closeFuelDetailModal(){
   document.getElementById('fuelDetailModal').classList.remove('show');
-}
-// ========== DIAGNOSTIKA (dočasné, v16.3) ==========
-function runDiagnostics(){
-  const out=document.getElementById('diagOutput');
-  if(!out)return;
-  const L=[];
-  try{
-    L.push('=== JÍZDY ('+state.trips.length+') ===');
-    sortedForRecalc(state.trips).forEach(t=>{
-      L.push(t.dateStart+(t.dateEnd&&t.dateEnd!==t.dateStart?'..'+t.dateEnd:'')
-        +' | '+(t.route||'?')+' | '+t.distance+' km | tacho '+t.tachoStart+'->'+tachoEnd(t));
-    });
-    L.push('');
-    L.push('=== TANKOVÁNÍ ('+state.phm.length+') ===');
-    phmSorted().forEach(p=>{
-      L.push(p.date+' | '+(p.place||'?')+' | tacho='+(p.tacho!=null&&p.tacho!==''?p.tacho:'PRÁZDNÉ')
-        +' | '+(p.fullTank?'plná':'částečná')+' | tripId='+(p.tripId||'-')
-        +' | photoId='+(p.photoId||'-'));
-    });
-    L.push('');
-    L.push('=== GENERÁTOR (simulace) ===');
-    const startTacho=genGetStartTacho();
-    L.push('startTacho='+startTacho);
-    let startDateISO;
-    if(state.trips.length>0){
-      let lastEnd='';
-      state.trips.forEach(t=>{const e=t.dateEnd||t.dateStart||'';if(e>lastEnd)lastEnd=e;});
-      startDateISO=new Date(parseISO(lastEnd).getTime()+86400000).toISOString().split('T')[0];
-    }else{startDateISO=todayISO();}
-    L.push('startDateISO='+startDateISO);
-    L.push('startPlace='+(genGetStartPlace()||'(prázdné)'));
-    const td=document.getElementById('genTargetDate')?document.getElementById('genTargetDate').value:'';
-    L.push('genTargetDate (pole)='+(td||'(nevyplněno – otevři generátor)'));
-    if(td){
-      const anch=genGetAnchors(startDateISO,td);
-      L.push('kotvy v období '+startDateISO+'..'+td+': '+anch.length);
-      anch.forEach(a=>L.push('  '+a.date+' tacho='+(a.tacho!=null&&a.tacho!==''?a.tacho:'PRÁZDNÉ')));
-    }
-  }catch(e){
-    L.push('CHYBA diagnostiky: '+(e&&e.message?e.message:e));
-  }
-  out.textContent=L.join('\n');
-  out.style.display='';
 }
 // ========== BIND EVENTS ==========
 function bindEvents(){
@@ -2660,8 +2653,6 @@ function bindEvents(){
   // ----- vozidlo -----
   document.getElementById('saveVehicle').addEventListener('click',saveVehicleForm);
   document.getElementById('btnResetTacho').addEventListener('click',resetAllTacho);
-  const diagBtn=document.getElementById('btnDiag');
-  if(diagBtn)diagBtn.addEventListener('click',runDiagnostics);
   // ----- oblíbené trasy -----
   document.getElementById('favSearch').addEventListener('input',(e)=>{
     state.favSearchText=e.target.value;renderFavList();
